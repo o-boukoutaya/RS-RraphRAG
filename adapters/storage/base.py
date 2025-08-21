@@ -1,11 +1,25 @@
 # adapters/storage/base.py
+# storage : root/tmp depuis settings, allow-list, quotas, collisions, create/list/delete/merge, écriture atomique.
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional, BinaryIO, Dict
 from corpus.models import Document
+from dataclasses import dataclass, field
 
 # base.py définit le contrat indépendant du support (FS local, S3…)
+
+class StorageError(Exception): ...
+class ExtensionNotAllowed(StorageError): ...
+class FileTooLarge(StorageError): ...
+class EmptyFile(StorageError): ...
+
+@dataclass(frozen=True)
+class StorageConfig:
+    root: Path
+    tmp_dir: Path
+    allowed_extensions: set[str] = field(default_factory=lambda: {".pdf",".txt",".csv",".docx",".xlsx",".xls"})
+    max_file_size_mb: int = 64
 
 class Storage(ABC):
     @abstractmethod

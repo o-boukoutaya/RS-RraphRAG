@@ -1,6 +1,7 @@
 from corpus.storage import FileStorage
 from pathlib import Path
 
+
 def test_create_series_and_save_bytes(tmp_path):
     storage = FileStorage(root=tmp_path)
     sid = storage.create_series()

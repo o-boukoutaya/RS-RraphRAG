@@ -3,13 +3,31 @@ from __future__ import annotations
 from importlib.resources import files
 from typing import Iterable, List, Set, Optional
 from fastapi import UploadFile
-from .models import ImportReport, RejectedFile, Document
-from .storage import LocalStorage
+from corpus.models import ImportReport, RejectedFile, Document
+from app.core.config import get_settings
+from corpus.storage import LocalStorage
+from adapters.storage.base import ExtensionNotAllowed, EmptyFile, FileTooLarge  # types d'erreurs
 from .utils import sanitize_series, make_series_id
 from pathlib import Path
+from functools import lru_cache
 
 from app.core.logging import get_logger
 logger = get_logger(__name__)
+
+_importer_singleton = None
+
+@lru_cache(maxsize=1)
+def get_importer() -> Importer:
+    global _importer_singleton
+    if _importer_singleton is None:
+        cfg = get_settings()  # cache déjà géré par get_settings()
+        storage = LocalStorage(
+            root=cfg.storage.root,
+            series_dirname=cfg.storage.series_dirname,
+        )
+        allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
+        _importer_singleton = Importer(storage=storage, allowed_extensions=allowed)
+    return _importer_singleton
 
 class Importer:
     """Service métier : gère l'import multi-fichiers et les règles d'acceptation."""
@@ -41,8 +59,16 @@ class Importer:
             try:
                 doc = await self.storage.save_upload(series, up)
                 report.accepted.append(doc)
+            # importer : cas “extension interdite”, “fichier vide”, “trop gros” renvoyés proprement sans toucher aux routes.
+            except ExtensionNotAllowed as e:
+                report.rejected.append(RejectedFile(name=up.filename, reason="extension"))
+            except EmptyFile:
+                report.rejected.append(RejectedFile(name=up.filename, reason="empty"))
+            except FileTooLarge:
+                report.rejected.append(RejectedFile(name=up.filename, reason="too_large"))
             except Exception as exc: # pragma: no cover (IO errors)
-                report.rejected.append(RejectedFile(filename=up.filename, reason=str(exc)))
+                report.rejected.append(RejectedFile(name=up.filename, reason=str(exc)))
+            
 
         # logger.info("Importer:import_docs:end", extra={"series": series, "accepted": len(report.accepted), "rejected": len(report.rejected)})
         return report

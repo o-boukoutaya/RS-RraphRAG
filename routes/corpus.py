@@ -1,7 +1,7 @@
 # routes/corpus.py
 from fastapi import APIRouter, UploadFile, File, Form
 from typing import List, Annotated, Optional
-from functools import lru_cache
+# from functools import lru_cache
 from app.core.logging import get_logger
 from app.core.config import get_settings
 from corpus.importer import Importer
@@ -12,18 +12,18 @@ from corpus.storage import LocalStorage
 router = APIRouter(prefix="/corpus", tags=["corpus"])
 logger = get_logger(__name__)
 
-@lru_cache(maxsize=1)
-def get_importer() -> Importer:
-    cfg = get_settings()  # cache déjà géré par get_settings()
-    storage = LocalStorage(
-        root=cfg.storage.root,
-        series_dirname=cfg.storage.series_dirname,
-    )
-    allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
-    return Importer(storage=storage, allowed_extensions=allowed)
+# @lru_cache(maxsize=1)
+# def get_importer() -> Importer:
+#     cfg = get_settings()  # cache déjà géré par get_settings()
+#     storage = LocalStorage(
+#         root=cfg.storage.root,
+#         series_dirname=cfg.storage.series_dirname,
+#     )
+#     allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
+#     return Importer(storage=storage, allowed_extensions=allowed)
 
-def _import_extra(*, series=None, files=None, **_):
-    return {"series": series, "count": len(files or [])}
+# def _import_extra(*, series=None, files=None, **_):
+#     return {"series": series, "count": len(files or [])}
 
 @router.post("/import")
 async def import_docs(

@@ -12,51 +12,30 @@ app:
   port: ${PORT:8050}
   log_level: ${LOG_LEVEL:INFO}
 
-# storage:
-#   backend: local
-#   root_dir: ${STORAGE_ROOT:-data}
-#   tmp_dir: ${STORAGE_TMP:-data/_tmp}
-#   allowed_extensions: [".pdf",".txt",".csv",".docx",".xlsx",".xls"]
 storage:
+  # backend: local
   root: ${STORAGE_ROOT:./data}
   series_dirname: series
-  # Extensions autorisées pour l'import multi-fichiers
   tmp_dir: ${STORAGE_TMP:./data/_tmp}
-  allowed_extensions: ['.pdf', '.txt', '.csv', '.docx', '.xlsx', '.xls']
+  allowed_extensions: ['.pdf', '.txt', '.csv', '.docx', '.xlsx', '.xls'] # Extensions autorisées pour l'import multi-fichiers
+  max_file_size_mb: 64
 
 upload:
   max_size_mb: 50
 
-# neo4j:
-#   uri: ${NEO4J_URI:-bolt://localhost:7687}
-#   database: ${NEO4J_DATABASE:-neo4j}
-#   username: ${NEO4J_USERNAME:-neo4j}
-#   password: ${NEO4J_PASSWORD:-}
 neo4j:
   uri: ${NEO4J_URI:bolt://localhost:7687}
   database: ${NEO4J_DATABASE:neo4j}
   username: ${NEO4J_USERNAME:neo4j}
   password: ${NEO4J_PASSWORD:neo4j}
+  timeout: 15
 
-# vector:
-#   provider: chroma
-#   params:
-#     persist_dir: data/chroma
 vector:
   provider: chroma
   chroma:
     persist_dir: ${CHROMA_DIR:./chroma}
-
-# llm:
-#   provider: openai.azure
-#   embedding_model: text-embedding-3-large
-#   chat_model: gpt-4o-mini
-#   params:
-#     api_base: ${OPENAI_API_BASE}
-#     api_key: ${OPENAI_API_KEY}
-#     api_version: ${OPENAI_API_VERSION}
-#     embedding_deployment: ${EMBEDDING_DEPLOYMENT:-text-embedding-3-large}
-#     chat_deployment: ${CHAT_DEPLOYMENT:-gpt-4o-mini}
+  type: memory
+  
 llm:
   provider: ${LLM_PROVIDER:openai} # openai | azure
   openai:
@@ -70,30 +49,29 @@ llm:
     api_version: ${AZURE_OPENAI_API_VERSION:2024-06-01}
     chat_deployment: ${AZURE_OPENAI_CHAT_DEPLOYMENT:gpt-4o-mini}
     embed_deployment: ${AZURE_OPENAI_EMBED_DEPLOYMENT:text-embedding-3-small}
+  embedder:
+    provider: ${EMBEDDER_PROVIDER:openai_azure}
+    model: ${EMBEDDER_MODEL:text-embedding-3-large}
+    api_base: ${OPENAI_API_BASE:}
+    api_key: ${OPENAI_API_KEY:}
+    api_version: ${OPENAI_API_VERSION:2024-02-15-preview}
+    dim: 0   # 0 => auto
 
-# ocr:
-#   enabled: true
-#   engine: tesseract
-#   languages: ["eng","fra","ara"]
-#   min_confidence: 0.4
 ocr:
   enabled: false
   provider: tesseract # ou "none"
   languages: ['eng', 'fra', 'ara']
   tesseract_cmd: ${TESSERACT_CMD:}
+  # min_confidence: 0.4
 
 embedding:
   dim: 1536
 
-# chunking:
-#   strategy: tokens
-#   tokens: 600
-#   overlap: 80
-#   normalize_whitespace: true
 chunk:
-  strategy: simple
+  strategy: simple # tokens
   size: 800
   overlap: 150
+  # normalize_whitespace: true
 
 pipelines:
   end_to_end:
