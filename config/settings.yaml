@@ -1,0 +1,45 @@
+app:
+  env: dev
+  host: 127.0.0.1
+  port: 8050
+  dev_reload: true
+
+storage:
+  backend: local
+  root_dir: ${STORAGE_ROOT:-data}
+  tmp_dir: ${STORAGE_TMP:-data/_tmp}
+  allowed_extensions: [".pdf",".txt",".csv",".docx",".xlsx",".xls"]
+
+neo4j:
+  uri: ${NEO4J_URI:-bolt://localhost:7687}
+  database: ${NEO4J_DATABASE:-neo4j}
+  username: ${NEO4J_USERNAME:-neo4j}
+  password: ${NEO4J_PASSWORD:-}
+
+vector:
+  provider: chroma
+  params:
+    persist_dir: data/chroma
+
+llm:
+  provider: openai.azure
+  embedding_model: text-embedding-3-large
+  chat_model: gpt-4o-mini
+  params:
+    api_base: ${OPENAI_API_BASE}
+    api_key: ${OPENAI_API_KEY}
+    api_version: ${OPENAI_API_VERSION}
+    embedding_deployment: ${EMBEDDING_DEPLOYMENT:-text-embedding-3-large}
+    chat_deployment: ${CHAT_DEPLOYMENT:-gpt-4o-mini}
+
+ocr:
+  enabled: true
+  engine: tesseract
+  languages: ["eng","fra","ara"]
+  min_confidence: 0.4
+
+chunking:
+  strategy: tokens
+  tokens: 600
+  overlap: 80
+  normalize_whitespace: true
