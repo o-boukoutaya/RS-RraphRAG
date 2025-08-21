@@ -1,20 +1,17 @@
 # app/main.py
 from fastapi import FastAPI
-from app.core.config import get_settings
-from app.core.logging import setup_logging
+from app.core.logging import setup_logging, get_logger
 from app.core.middleware import RequestContextMiddleware
-from routes import corpus as corpus_routes
+# from app.core.config import get_settings  # si besoin
+# Enregistre les extractors au boot :
+from corpus.extractor import pdf, docx, csv_txt, xlsx  # noqa: F401
+from routes import api_router
 
-def create_app():
-    setup_logging()
-    app = FastAPI(title="RS-RRAPHrag v2")
-    app.add_middleware(RequestContextMiddleware)
-    app.include_router(corpus_routes.router)
-    return app
+setup_logging("INFO")
+app = FastAPI()
+app.add_middleware(RequestContextMiddleware)
+app.include_router(api_router)
 
-app = create_app()
+log = get_logger(__name__)
 
-if __name__ == "__main__":
-    s = get_settings()
-    import uvicorn
-    uvicorn.run("app.main:app", host=s.host, port=s.port, reload=s.dev_reload)
+# http://127.0.0.1:8050/docs#/

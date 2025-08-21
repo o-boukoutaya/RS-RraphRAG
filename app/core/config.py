@@ -1,95 +1,169 @@
 # app/core/config.py
 # Core → config (YAML + env + cache)
 from __future__ import annotations
-from dataclasses import dataclass, field
+import os
+import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
-import os, yaml
+from typing import Any, Dict, List, Optional
 
-ROOT = Path(__file__).resolve().parents[2]
-CFG_DIR = ROOT / "config"
-SETTINGS_FILE = CFG_DIR / "settings.yaml"
 
-def _env_expand(obj):
-    if isinstance(obj, str):
-        return os.path.expandvars(obj)
-    if isinstance(obj, list):
-        return [_env_expand(x) for x in obj]
-    if isinstance(obj, dict):
-        return {k: _env_expand(v) for k, v in obj.items()}
-    return obj
+import yaml
+from pydantic import BaseModel, Field, ValidationError
+from dotenv import load_dotenv
 
-@dataclass
-class StorageCfg:
-    backend: str = "local"
-    root_dir: str = "data"
-    tmp_dir: str = "data/_tmp"
-    allowed_extensions: List[str] = field(default_factory=lambda: [".pdf",".txt",".csv",".docx",".xlsx",".xls"])
+# ---------------------------------------------------------------------------
+# Pydantic models (typage fort + auto-doc)
+# ---------------------------------------------------------------------------
 
-@dataclass
-class Neo4jCfg:
-    uri: str = "bolt://localhost:7687"
-    database: str = "neo4j"
-    username: str = "neo4j"
-    password: str = ""
-
-@dataclass
-class VectorCfg:
-    provider: str = "chroma"
-    params: Dict[str, str] = field(default_factory=dict)
-
-@dataclass
-class LlmCfg:
-    provider: str = "openai.azure"
-    embedding_model: str = "text-embedding-3-large"
-    chat_model: str = "gpt-4o-mini"
-    params: Dict[str, str] = field(default_factory=dict)
-
-@dataclass
-class OcrCfg:
-    enabled: bool = True
-    engine: str = "tesseract"           # ou "rapidocr"
-    languages: List[str] = field(default_factory=lambda: ["eng","fra","ara"])
-    min_confidence: float = 0.4
-
-@dataclass
-class ChunkCfg:
-    strategy: str = "tokens"
-    tokens: int = 600
-    overlap: int = 80
-    normalize_whitespace: bool = True
-
-@dataclass
-class Settings:
+# Configuration de l'application
+class AppCfg(BaseModel):
+    name: str = "rs-rraPhrag"
     env: str = "dev"
     host: str = "127.0.0.1"
     port: int = 8050
-    dev_reload: bool = True
-    storage: StorageCfg = field(default_factory=StorageCfg)
-    neo4j: Neo4jCfg = field(default_factory=Neo4jCfg)
-    vector: VectorCfg = field(default_factory=VectorCfg)
-    llm: LlmCfg = field(default_factory=LlmCfg)
-    ocr: OcrCfg = field(default_factory=OcrCfg)
-    chunking: ChunkCfg = field(default_factory=ChunkCfg)
+    log_level: str = "INFO"
 
-# Core/config : get_settings() lit YAML + ${ENV}, renvoie des dataclasses typées → cohérent et flexible.
-@lru_cache()
-def get_settings() -> Settings:
-    with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+# Configuration du stockage
+class StorageCfg(BaseModel):
+    root: Path = Path("./data")
+    series_dirname: str = "series"
+    root: Path = Path("./data")
+    series_dirname: str = "series"
+    tmp_dir: Path = Path("./data/_tmp")
+    allowed_extensions: List[str] = Field(default_factory=lambda: [
+    ".pdf", ".txt", ".csv", ".docx", ".xlsx", ".xls"
+    ])
+
+# Configuration de l'upload
+class UploadCfg(BaseModel):
+    max_size_mb: int = 50
+
+# Configuration de l'OCR
+class OcrCfg(BaseModel):
+    enabled: bool = False
+    provider: str = "tesseract"
+    languages: List[str] = Field(default_factory=lambda: ["eng", "fra", "ara"])
+    tesseract_cmd: Optional[str] = None
+
+# Configuration de l'API OpenAI
+class OpenAICfg(BaseModel):
+    api_key: Optional[str] = None
+    api_base: str = "https://api.openai.com/v1"
+    chat_model: str = "gpt-4o-mini"
+    embed_model: str = "text-embedding-3-small"
+
+# Configuration de l'API Azure OpenAI
+class AzureOpenAICfg(BaseModel):
+    api_key: Optional[str] = None
+    endpoint: Optional[str] = None
+    api_version: str = "2024-06-01"
+    chat_deployment: str = "gpt-4o-mini"
+    embed_deployment: str = "text-embedding-3-small"
+
+# Configuration du modèle de langage
+class LLMCfg(BaseModel):
+    provider: str = "openai" # openai | azure
+    openai: OpenAICfg = OpenAICfg()
+    azure: AzureOpenAICfg = AzureOpenAICfg()
+
+# Configuration de la base de données Neo4j
+class Neo4jCfg(BaseModel):
+    uri: str = "bolt://localhost:7687"
+    database: str = "neo4j"
+    username: str = "neo4j"
+    password: str = "neo4j"
+
+# Configuration du stockage vectoriel chroma DB
+class VectorChromaCfg(BaseModel):
+    persist_dir: Path = Path("./chroma")
+
+# Configuration du stockage vectoriel
+class VectorCfg(BaseModel):
+    provider: str = "chroma"
+    chroma: VectorChromaCfg = VectorChromaCfg()
+
+# Configuration des embeddings
+class EmbeddingCfg(BaseModel):
+    dim: int = 1536
+
+# Configuration du découpage
+class ChunkCfg(BaseModel):
+    strategy: str = "simple"
+    size: int = 800
+    overlap: int = 150
+
+# Configuration des pipelines
+class PipelinesCfg(BaseModel):
+    end_to_end: Dict[str, List[str]] | Dict[str, Any] | None = None
+
+# Configuration générale
+class Settings(BaseModel):
+    app: AppCfg = AppCfg()
+    storage: StorageCfg = StorageCfg()
+    upload: UploadCfg = UploadCfg()
+    ocr: OcrCfg = OcrCfg()
+    llm: LLMCfg = LLMCfg()
+    neo4j: Neo4jCfg = Neo4jCfg()
+    vector: VectorCfg = VectorCfg()
+    embedding: EmbeddingCfg = EmbeddingCfg()
+    chunk: ChunkCfg = ChunkCfg()
+    pipelines: PipelinesCfg = PipelinesCfg()
+
+# ---------------------------------------------------------------------------
+# YAML loader + interpolation ${VAR:default}
+# ---------------------------------------------------------------------------
+
+# Pattern pour l'expansion des variables d'environnement
+_env_pattern = re.compile(r"\$\{([A-Z0-9_]+)(?::([^}]*))?\}")
+
+# Fonction d'interpolation des variables d'environnement
+def _interpolate_env(value: Any) -> Any:
+    if isinstance(value, str):
+        def repl(match: re.Match[str]) -> str:
+            var, default = match.group(1), match.group(2) or ""
+            return os.getenv(var, default)
+        return _env_pattern.sub(repl, value)
+    if isinstance(value, dict):
+        return {k: _interpolate_env(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_interpolate_env(v) for v in value]
+    return value
+
+# Fonction de chargement des fichiers YAML
+def _load_yaml(path: Path) -> Dict[str, Any]:
+    if not os.path.exists(path):
+        return {}
+    with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
-    raw = _env_expand(raw)                # remplace ${VARS} par os.environ
-    # merge simple (tu peux raffiner si besoin)
-    s = Settings(
-        env=raw.get("app",{}).get("env","dev"),
-        host=raw.get("app",{}).get("host","127.0.0.1"),
-        port=int(raw.get("app",{}).get("port",8050)),
-        dev_reload=bool(raw.get("app",{}).get("dev_reload", True)),
-        storage=StorageCfg(**raw.get("storage",{})),
-        neo4j=Neo4jCfg(**raw.get("neo4j",{})),
-        vector=VectorCfg(**raw.get("vector",{})),
-        llm=LlmCfg(**raw.get("llm",{})),
-        ocr=OcrCfg(**raw.get("ocr",{})),
-        chunking=ChunkCfg(**raw.get("chunking",{})),
-    )
-    return s
+    return raw
+
+# ---------------------------------------------------------------------------
+# Public factory (cache)
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)  # Cache pour éviter de recharger à chaque appel
+# get_settings : renvoie les paramètres de configuration
+def get_settings() -> Settings:
+    """Charge .env puis settings.yaml, effectue l'interpolation et valide."""
+    load_dotenv(override=True)
+
+    cfg_path = Path("config/settings.yaml")
+    data = _load_yaml(cfg_path)
+    data = _interpolate_env(data)
+
+    try:
+        return Settings(**data)
+    except ValidationError as exc:
+        # Affiche l'erreur proprement dès le boot
+        raise RuntimeError(f"Invalid configuration in {cfg_path}:\n{exc}")
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+__all__ = [
+"Settings",
+"get_settings",
+]

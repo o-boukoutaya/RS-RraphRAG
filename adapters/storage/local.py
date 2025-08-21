@@ -22,7 +22,7 @@ class LocalStorage(Storage):
 
     def put_file(self, series: str, filename: str, data: bytes) -> Document:
         series_dir = self.ensure_series(series)
-        safe = Path(filename).name
+        safe = Path(filename).name # Nettoyage nom de fichier ⇒ limite les attaques par traversée de chemin.
         dst = series_dir / safe
         tmp = self.tmp / (safe + ".part")
         with open(tmp, "wb") as f: f.write(data)
@@ -56,7 +56,7 @@ class LocalStorage(Storage):
                     target = dest_dir / p.name
                     if target.exists():
                         # dédoublonnage simple
-                        target = dest_dir / f"{p.stem}__{s}{p.suffix}"
+                        target = dest_dir / f"{p.stem}__{s}{p.suffix}" # Fusion de séries avec dédoublonnage
                     shutil.move(str(p), str(target))
                     out.append(Document(series=dest, filename=target.name, path=str(target)))
             shutil.rmtree(src, ignore_errors=True)

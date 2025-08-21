@@ -1,29 +1,37 @@
 # corpus/models.py
-from dataclasses import dataclass, field
-from pathlib import Path
+from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
+from pydantic import BaseModel, Field
 
-@dataclass
-class Document:
+class Document(BaseModel):
     series: str
     filename: str
-    path: str
+    path: str                # ← string côté API
+    size: Optional[int] = None
     mime: Optional[str] = None
-    meta: Dict = field(default_factory=dict)
+    sha256: Optional[str] = None
+    meta: Dict = Field(default_factory=dict)
 
-@dataclass
-class TextBlock:
+class TextBlock(BaseModel):
     doc: Document
-    page: int
-    order: int
+    page: int | None = None
+    order: int | None = None
     text: str
-    bbox: Optional[Tuple[float,float,float,float]] = None
-    lang: Optional[str] = None
+    bbox: Tuple[float, float, float, float] | None = None
+    lang: str | None = None
 
-@dataclass
-class Chunk:
+class Chunk(BaseModel):
     doc: Document
     idx: int
     text: str
-    meta: Dict = field(default_factory=dict)
-    
+    meta: Dict = Field(default_factory=dict)
+
+class RejectedFile(BaseModel):
+    filename: str
+    reason: str
+    # timestamp: float
+
+class ImportReport(BaseModel):
+    series: str
+    accepted: List[Document] = Field(default_factory=list)
+    rejected: List[RejectedFile] = Field(default_factory=list)

@@ -1,21 +1,33 @@
 # app/core/middleware.py
-import time, uuid, logging
+from __future__ import annotations
+import time
+from typing import Callable
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from .logging import request_id_var
+from starlette.responses import Response
 
-log = logging.getLogger("app.middleware")
+from .logging import request_id_var, get_logger, new_request_id
 
-# Middleware : RequestContextMiddleware pose X-Request-ID/UUID et mesure la latence.
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        rid = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    """Injecte un request_id + logs start/stop + durée."""
+
+
+    def __init__(self, app, header_name: str = "X-Request-Id") -> None: # type: ignore[no-untyped-def]
+        super().__init__(app)
+        self.header_name = header_name
+        self.log = get_logger(__name__)
+
+
+    async def dispatch(self, request: Request, call_next: Callable): # type: ignore[override]
+        rid = request.headers.get(self.header_name) or new_request_id()
         token = request_id_var.set(rid)
         start = time.perf_counter()
-        log.info("request.start", extra={"path": request.url.path, "method": request.method})
+        self.log.info("request start %s %s", request.method, request.url.path)
         try:
-            response = await call_next(request)
-            return response
+            response: Response = await call_next(request)
         finally:
-            duration_ms = round((time.perf_counter() - start)*1000, 2)
-            log.info("request.end", extra={"path": request.url.path, "duration_ms": duration_ms})
+            duration = (time.perf_counter() - start) * 1000
+            self.log.info("request end %s %s (%.2f ms)", request.method, request.url.path, duration)
             request_id_var.reset(token)
+        response.headers[self.header_name] = rid
+        return response
