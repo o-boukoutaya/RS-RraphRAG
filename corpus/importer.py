@@ -18,15 +18,15 @@ _importer_singleton = None
 
 @lru_cache(maxsize=1)
 def get_importer() -> Importer:
-    global _importer_singleton
-    if _importer_singleton is None:
-        cfg = get_settings()  # cache déjà géré par get_settings()
-        storage = LocalStorage(
-            root=cfg.storage.root,
-            series_dirname=cfg.storage.series_dirname,
-        )
-        allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
-        _importer_singleton = Importer(storage=storage, allowed_extensions=allowed)
+    # global _importer_singleton
+    # if _importer_singleton is None:
+    cfg = get_settings()  # cache déjà géré par get_settings()
+    storage = LocalStorage(
+        root=cfg.storage.root,
+        series_dirname=cfg.storage.series_dirname,
+    )
+    allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
+    _importer_singleton = Importer(storage=storage, allowed_extensions=allowed)
     return _importer_singleton
 
 class Importer:
