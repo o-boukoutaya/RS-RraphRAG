@@ -1,28 +1,50 @@
 # adapters/llm/base.py
-# LLM/Embedding : contrat minimal (embed, embed_batch, dim).
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List, Sequence, Optional, Protocol
+from typing import Protocol, Sequence, List, Optional, Iterable, Iterator, Any
+import logging
+import os
 
-class Embedder(ABC):
-    name: str
-    dim: int
+log = logging.getLogger(__name__)
+
+class Provider(Protocol):
+    """
+    Interface minimale commune à tous les providers.
+    - embed / embed_batch : retournent des vecteurs (list[float])
+    - ask_llm : retourne un texte (string)
+    """
+
+    # ---- Embeddings ----    
+    @abstractmethod
+    def embed(self, text: str, *, dimensions: Optional[int] = None) -> List[float]: ...
 
     @abstractmethod
-    def embed(self, text: str) -> List[float]: ...
+    def embed_batch(self, texts: Sequence[str], *, dimensions: Optional[int] = None) -> List[List[float]]: ...
+
+    def embed_texts(self, texts: List[str], *, dimensions: Optional[int] = None) -> List[List[float]]:
+        return self.embed_batch(texts, dimensions=dimensions)
     
-    @abstractmethod
-    def embed_batch(self, texts: Sequence[str]) -> List[List[float]]: ...
+    # ---- Chat ----
+    def ask_llm(self, query: str) -> str: ...
 
-    @abstractmethod
-    def embed_texts(self, texts: List[str]) -> List[List[float]]: ...
+    # ---- Introspection facultative ----
+    def capabilities(self) -> dict:
+        """
+        Renvoie des métadonnées utiles (provider, supports_chat, supports_embeddings, models, dims si connues).
+        """
+        return {}
+
+# ---------------------- Helpers communs ----------------------
+
+def _get_env(name: str, default: Optional[str] = None) -> Optional[str]:
+    v = os.getenv(name)
+    if v is None or str(v).strip() == "":
+        return default
+    return v
 
 
-@dataclass
-class EmbedderConfig:
-    provider: str = "openai_azure"
-    model: str = "text-embedding-3-large"
-    api_key: Optional[str] = None
-    api_base: Optional[str] = None   # https://{resource}.openai.azure.com
-    api_version: str = "2024-02-15-preview"
-    dim: int = 0  # 0 => autodetect
+def batch_iter(seq: Sequence[Any], size: int) -> Iterator[Sequence[Any]]:
+    """Découpe une séquence en sous-listes de taille <= size."""
+    if size <= 0:
+        size = 1
+    for i in range(0, len(seq), size):
+        yield seq[i:i + size]

@@ -6,6 +6,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, replace
 
 
 import yaml
@@ -22,57 +23,34 @@ class AppCfg(BaseModel):
     env: str = "dev"
     host: str = "127.0.0.1"
     port: int = 8050
+    port_snd: int = 8443
     log_level: str = "INFO"
+    # dev_reload: bool = True
 
 # Configuration du stockage
 class StorageCfg(BaseModel):
     root: Path = Path("./data")
-    series_dirname: str = "series"
-    root: Path = Path("./data")
-    series_dirname: str = "series"
     tmp_dir: Path = Path("./data/_tmp")
+    series_dirname: str = "series"
     allowed_extensions: List[str] = Field(default_factory=lambda: [
     ".pdf", ".txt", ".csv", ".docx", ".xlsx", ".xls"
     ])
-
-# Configuration de l'upload
-class UploadCfg(BaseModel):
-    max_size_mb: int = 50
-
-# Configuration de l'OCR
-class OcrCfg(BaseModel):
-    enabled: bool = False
-    provider: str = "tesseract"
-    languages: List[str] = Field(default_factory=lambda: ["eng", "fra", "ara"])
-    tesseract_cmd: Optional[str] = None
-
-# Configuration de l'API OpenAI
-class OpenAICfg(BaseModel):
-    api_key: Optional[str] = None
-    api_base: str = "https://api.openai.com/v1"
-    chat_model: str = "gpt-4o-mini"
-    embed_model: str = "text-embedding-3-small"
-
-# Configuration de l'API Azure OpenAI
-class AzureOpenAICfg(BaseModel):
-    api_key: Optional[str] = None
-    endpoint: Optional[str] = None
-    api_version: str = "2024-06-01"
-    chat_deployment: str = "gpt-4o-mini"
-    embed_deployment: str = "text-embedding-3-small"
-
-# Configuration du modèle de langage
-class LLMCfg(BaseModel):
-    provider: str = "openai" # openai | azure
-    openai: OpenAICfg = OpenAICfg()
-    azure: AzureOpenAICfg = AzureOpenAICfg()
+    max_file_size_mb: int = 64
 
 # Configuration de la base de données Neo4j
+# @dataclass(frozen=True)
 class Neo4jCfg(BaseModel):
     uri: str = "bolt://localhost:7687"
     database: str = "neo4j"
     username: str = "neo4j"
     password: str = "neo4j"
+    connection_timeout: float = 15.0
+    max_connection_lifetime: int = 3600
+    max_transaction_retry_time: float = 10.0
+
+# Configuration de l'upload
+# class UploadCfg(BaseModel):
+#     max_size_mb: int = 50
 
 # Configuration du stockage vectoriel chroma DB
 class VectorChromaCfg(BaseModel):
@@ -82,16 +60,54 @@ class VectorChromaCfg(BaseModel):
 class VectorCfg(BaseModel):
     provider: str = "chroma"
     chroma: VectorChromaCfg = VectorChromaCfg()
+    type: str = "memory"
 
-# Configuration des embeddings
-class EmbeddingCfg(BaseModel):
-    dim: int = 1536
+# Configuration de l'API OpenAI
+class OpenAICfg(BaseModel):
+    api_key: Optional[str] = None
+#     api_base: str = "https://api.openai.com/v1"
+    chat_model: str = "gpt-4o-mini"
+    embed_model: str = "text-embedding-ada-002"
+
+# Configuration de l'API Azure OpenAI
+class AzureOpenAICfg(BaseModel):
+    api_key: Optional[str] = None
+    api_version: str = "2023-07-01-preview"
+    azure_endpoint: Optional[str] = None # https://openai4orange.openai.azure.com
+    dep_name: Optional[str] = None # "4Orange"
+    embed_dep: Optional[str] = "text-embedding-ada-002"
+
+# Configuration de l'API Gemini
+class GeminiCfg(BaseModel):
+    api_key: Optional[str] = None
+    chat_model: str = "gemini-1.5-pro"
+    embed_model: str = "text-embedding-004"
+
+# Configuration du LLM provider
+class ProviderCfg(BaseModel):
+    openai : OpenAICfg = OpenAICfg()
+    azure: AzureOpenAICfg = AzureOpenAICfg()
+    gemini: GeminiCfg = GeminiCfg()
+    default: str = "azure" # openai | azure | gemini
+
+# Configuration de l'OCR
+class OcrCfg(BaseModel):
+    enabled: bool = False
+    provider: str = "tesseract"
+    languages: List[str] = Field(default_factory=lambda: ["eng", "fra", "ara"])
+    tesseract_cmd: Optional[str] = None
+    tessdata_prefix: Optional[str] = None
 
 # Configuration du découpage
 class ChunkCfg(BaseModel):
     strategy: str = "simple"
     size: int = 800
     overlap: int = 150
+
+
+# # Configuration des embeddings
+# class EmbeddingCfg(BaseModel):
+#     dim: int = 1536
 
 # Configuration des pipelines
 class PipelinesCfg(BaseModel):
@@ -101,14 +117,14 @@ class PipelinesCfg(BaseModel):
 class Settings(BaseModel):
     app: AppCfg = AppCfg()
     storage: StorageCfg = StorageCfg()
-    upload: UploadCfg = UploadCfg()
-    ocr: OcrCfg = OcrCfg()
-    llm: LLMCfg = LLMCfg()
     neo4j: Neo4jCfg = Neo4jCfg()
     vector: VectorCfg = VectorCfg()
-    embedding: EmbeddingCfg = EmbeddingCfg()
+    provider: ProviderCfg = ProviderCfg()
+    ocr: OcrCfg = OcrCfg()
     chunk: ChunkCfg = ChunkCfg()
     pipelines: PipelinesCfg = PipelinesCfg()
+
+
 
 # ---------------------------------------------------------------------------
 # YAML loader + interpolation ${VAR:default}
@@ -142,7 +158,6 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 # Public factory (cache)
 # ---------------------------------------------------------------------------
 
-
 @lru_cache(maxsize=1)  # Cache pour éviter de recharger à chaque appel
 # get_settings : renvoie les paramètres de configuration
 def get_settings() -> Settings:
@@ -158,6 +173,26 @@ def get_settings() -> Settings:
     except ValidationError as exc:
         # Affiche l'erreur proprement dès le boot
         raise RuntimeError(f"Invalid configuration in {cfg_path}:\n{exc}")
+
+
+# Fonction de validation des paramètres
+# def validate_settings(settings):
+#     p = settings.llm.provider
+#     missing = []
+#     if p == "openai":
+#         for k in ["api_key", "base_url", "chat_model", "embed_model"]:
+#             if not getattr(settings.llm.openai, k, None):
+#                 missing.append(f"llm.openai.{k}")
+#     elif p == "azure":
+#         for k in ["api_key", "endpoint", "api_version", "chat_deployment", "embed_deployment"]:
+#             if not getattr(settings.llm.azure, k, None):
+#                 missing.append(f"llm.azure.{k}")
+#     elif p == "gemini":
+#         for k in ["api_key", "chat_model", "embed_model"]:
+#             if not getattr(settings.llm.gemini, k, None):
+#                 missing.append(f"llm.gemini.{k}")
+#     if missing:
+#         raise RuntimeError(f"Invalid settings for provider={p}: missing {', '.join(missing)}")
 
 
 # ---------------------------------------------------------------------------

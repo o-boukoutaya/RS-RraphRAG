@@ -5,38 +5,41 @@ from typing import Iterable, List, Set, Optional
 from fastapi import UploadFile
 from corpus.models import ImportReport, RejectedFile, Document
 from app.core.config import get_settings
-from corpus.storage import LocalStorage
+from app.core.resources import get_storage
+# from corpus.storage import LocalStorage
+# from adapters.storage.local import LocalStorage
+from app.core.resources import get_storage
 from adapters.storage.base import ExtensionNotAllowed, EmptyFile, FileTooLarge  # types d'erreurs
 from .utils import sanitize_series, make_series_id
 from pathlib import Path
-from functools import lru_cache
+# from functools import lru_cache
 
 from app.core.logging import get_logger
 logger = get_logger(__name__)
 
-_importer_singleton = None
+# _importer_singleton = None
 
-@lru_cache(maxsize=1)
-def get_importer() -> Importer:
-    # global _importer_singleton
-    # if _importer_singleton is None:
-    cfg = get_settings()  # cache déjà géré par get_settings()
-    storage = LocalStorage(
-        root=cfg.storage.root,
-        series_dirname=cfg.storage.series_dirname,
-    )
-    allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
-    _importer_singleton = Importer(storage=storage, allowed_extensions=allowed)
-    return _importer_singleton
+# @lru_cache(maxsize=1)
+# def get_importer() -> Importer:
+#     # global _importer_singleton
+#     # if _importer_singleton is None:
+#     cfg = get_settings()  # cache déjà géré par get_settings()
+#     storage = LocalStorage(
+#         root=cfg.storage.root,
+#         series_dirname=cfg.storage.series_dirname,
+#     )
+#     allowed = {ext.lower() for ext in cfg.storage.allowed_extensions}
+#     _importer_singleton = Importer(storage=storage, allowed_extensions=allowed)
+#     # endif
+#     return _importer_singleton
 
 class Importer:
     """Service métier : gère l'import multi-fichiers et les règles d'acceptation."""
 
-    def __init__(self, storage: LocalStorage, allowed_extensions: Iterable[str]) -> None:
-        self.storage = storage
-        self.allowed: Set[str] = {ext.lower().strip() for ext in (allowed_extensions or {
-            ".pdf", ".txt", ".csv", ".docx", ".xlsx", ".xls"
-        })}
+    def __init__(self) -> None:
+        # self.storage = LocalStorage()
+        self.storage = get_storage()
+        self.allowed = self.storage.allowed
 
     def _is_allowed(self, filename: str) -> bool:
         dot = filename.rfind('.')
@@ -61,14 +64,14 @@ class Importer:
                 report.accepted.append(doc)
             # importer : cas “extension interdite”, “fichier vide”, “trop gros” renvoyés proprement sans toucher aux routes.
             except ExtensionNotAllowed as e:
-                report.rejected.append(RejectedFile(name=up.filename, reason="extension"))
+                report.rejected.append(RejectedFile(filename=up.filename, reason="extension"))
             except EmptyFile:
-                report.rejected.append(RejectedFile(name=up.filename, reason="empty"))
+                report.rejected.append(RejectedFile(filename=up.filename, reason="empty"))
             except FileTooLarge:
-                report.rejected.append(RejectedFile(name=up.filename, reason="too_large"))
+                report.rejected.append(RejectedFile(filename=up.filename, reason="too_large"))
             except Exception as exc: # pragma: no cover (IO errors)
-                report.rejected.append(RejectedFile(name=up.filename, reason=str(exc)))
+                reason = getattr(exc, "__class__", type("E",(object,),{})).__name__
+                report.rejected.append(RejectedFile(filename=up.filename, reason=reason, message=str(exc)))
             
-
         # logger.info("Importer:import_docs:end", extra={"series": series, "accepted": len(report.accepted), "rejected": len(report.rejected)})
         return report

@@ -12,7 +12,7 @@ async def test_import_route_ok():
             ("files", ("doc1.txt", io.BytesIO(b"Hello"), "text/plain")),
             ("files", ("doc2.txt", io.BytesIO(b"World"), "text/plain")),
         ]
-        r = await ac.post("/api/v2/corpus/import", params={"series": "s1"}, files=files)
+        r = await ac.post("/api/corpus/import", params={"series": "s1"}, files=files)
         assert r.status_code == 200
         data = r.json()
         assert data["series"] == "s1"

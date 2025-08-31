@@ -14,14 +14,20 @@ class ExtensionNotAllowed(StorageError): ...
 class FileTooLarge(StorageError): ...
 class EmptyFile(StorageError): ...
 
-@dataclass(frozen=True)
-class StorageConfig:
-    root: Path
-    tmp_dir: Path
-    allowed_extensions: set[str] = field(default_factory=lambda: {".pdf",".txt",".csv",".docx",".xlsx",".xls"})
-    max_file_size_mb: int = 64
+# @dataclass(frozen=True)
+# class StorageConfig:
+#     root: Path
+#     tmp_dir: Path
+#     allowed_extensions: set[str] = field(default_factory=lambda: {".pdf",".txt",".csv",".docx",".xlsx",".xls"})
+#     max_file_size_mb: int = 64
 
 class Storage(ABC):
+
+    # ensure_series
+    # _safe_name
+    # _resolve_collision
+    # save_upload
+
     @abstractmethod
     def ensure_series(self, series: str) -> Path: ...
 
