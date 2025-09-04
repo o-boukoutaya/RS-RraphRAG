@@ -87,6 +87,7 @@ class Neo4jAdapter:
 
     # ---------- Schéma ----------
     def ensure_base_schema(self) -> None:
+        """Crée les contraintes d’unicité de base."""
         with self._driver.session() as s:
             for qi in C.BASE_SCHEMA:
                 try:

@@ -31,6 +31,7 @@ Exemples d'entités: Project, UnitType, Unit, City, Place, Developer, Amenity, P
 Exemples de relations: LOCATED_IN, DEVELOPS, OFFERS, HAS_AMENITY, PRICE_FROM, NEAR."""
 
 def build_extraction_prompt(text: str, domain_hint: str = "immobilier") -> str:
+    """Construit le prompt d'extraction pour un texte donné."""
     base = GENERIC_INSTRUCTIONS_FR
     if (domain_hint or "").strip().lower() in {"immobilier", "immo", "real-estate"}:
         base = base + "\n" + IMMOBILIER_HINT_FR

@@ -11,6 +11,7 @@ class HybridRetriever:
     dense: DenseRetriever
 
     def search(self, req: SearchRequest) -> SearchResponse:
+        """Effectue une recherche hybride combinant KG et dense."""
         kg_res = self.kg.search(req)
         dn_res = self.dense.search(req)
 
@@ -18,7 +19,9 @@ class HybridRetriever:
         alpha, beta = 0.6, 0.4
         bucket: Dict[str, Hit] = {}
 
+        # Fonction d'ajout au bucket
         def push(h: Hit, w: float):
+            """Ajoute un hit au bucket avec un poids donné."""
             if h.id in bucket:
                 bucket[h.id].score += w * h.score
                 # enrichir le texte si absent
@@ -32,7 +35,10 @@ class HybridRetriever:
         for h in kg_res.hits: push(h, alpha)
         for h in dn_res.hits: push(h, beta)
 
+        # Trier et limiter les résultats
         hits = sorted(bucket.values(), key=lambda x: x.score, reverse=True)[:req.k]
+
+        # Retourner la réponse hybride
         return SearchResponse(
             query=req.query, mode="hybrid", hits=hits,
             diagnostics={"kg_hits": len(kg_res.hits), "dense_hits": len(dn_res.hits)}

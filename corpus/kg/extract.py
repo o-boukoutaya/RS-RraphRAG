@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple, Optional
 from corpus.kg.prompts import build_extraction_prompt
 
 def _strip_code_fences(s: str) -> str:
+    """Supprime les fences de code (```...```) d'une chaîne."""
     s = s.strip()
     if s.startswith("```"):
         s = re.sub(r"^```[a-zA-Z0-9]*\s*", "", s)
@@ -27,12 +28,14 @@ def _coerce_json(s: str) -> Dict[str, Any]:
         return json.loads(s)
 
 def _slug(s: str) -> str:
+    """Crée un slug simple (a-z0-9-) à partir d'une chaîne."""
     s = s.strip().lower()
     s = re.sub(r"\s+", " ", s)
     s = re.sub(r"[^a-z0-9\- _]", "", s)
     return s.replace(" ", "-")[:128] or "x"
 
 def canonical_entity_id(series: str, typ: str, name: str) -> str:
+    """Crée un ID d'entité canonique à partir des métadonnées."""
     base = f"{series}|{typ}|{_slug(name)}"
     # stable + compact
     h = hashlib.sha1(base.encode("utf-8")).hexdigest()[:16]

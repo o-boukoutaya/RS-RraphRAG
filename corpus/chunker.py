@@ -78,6 +78,7 @@ class Chunker:
 
     # ---------- Stratégies de split ----------
     def character_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de caractères."""
         chunks: List[str] = []
         i = 0
         step = max(1, self.opts.size - self.opts.overlap)
@@ -87,6 +88,7 @@ class Chunker:
         return [c.strip() for c in chunks if c.strip()]
 
     def word_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de mots."""
         words = re.findall(r"\S+", text)
         parts: List[str] = []
         start = 0
@@ -97,18 +99,22 @@ class Chunker:
         return [p.strip() for p in parts if p.strip()]
 
     def sentence_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de phrases."""
         sentences = re.split(r"(?<=[\.\!\?])\s+", text)
         return _merge([s.strip() for s in sentences if s.strip()], self.opts.size, self.opts.overlap)
 
     def paragraph_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de paragraphes."""
         paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
         return _merge(paragraphs, self.opts.size, self.opts.overlap)
 
     def line_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de lignes."""
         lines = [l.strip() for l in text.splitlines() if l.strip()]
         return _merge(lines, self.opts.size, self.opts.overlap)
 
     def recursive_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de manière récursive."""
         # on descend les séparateurs jusqu’à atteindre une granularité proche de size
         splits = [text]
         for sep in self.opts.separators:
@@ -122,6 +128,7 @@ class Chunker:
         return _merge([s.strip() for s in splits if s.strip()], self.opts.size, self.opts.overlap)
 
     def token_split(self, text: str) -> List[str]:
+        """Divise le texte en chunks de tokens."""
         # approximation par mots (vous pourrez brancher tiktoken ici)
         return self.word_split(text)
 
@@ -160,6 +167,7 @@ class Chunker:
             return self._heuristic_suggest(text)
 
     def _heuristic_suggest(self, text: str) -> Tuple[str, int, int]:
+        """Heuristique simple pour suggérer (strategy, size, overlap)."""
         n = len(text)
         bullet_rate = text.count("•") + text.count("- ")
         newline_rate = text.count("\n")
@@ -173,6 +181,7 @@ class Chunker:
 
     # ---------- API principale ----------
     def split_text(self, text: str) -> List[str]:
+        """Divise un texte en chunks selon la stratégie choisie."""
         strat = self.opts.strategy
         if strat == "llm":
             strat, sz, ov = self.llm_suggest(text)
@@ -186,6 +195,7 @@ class Chunker:
         return btype in {"price_panel", "table"}
 
     def split_blocks(self, blocks: Iterable[TextBlock]) -> List[Chunk]:
+        """Divise une série de TextBlock en une série de Chunk."""
         idx = 0
         results: List[Chunk] = []
         for b in blocks:
@@ -237,6 +247,9 @@ class ChunkRunner:
         self.log = get_logger("chunker")
 
     def _load_blocks(self, path: Path) -> List[TextBlock]:
+        """
+        Charge les blocs de texte à partir d'un fichier JSONL.
+        """
         items: List[TextBlock] = []
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -263,12 +276,16 @@ class ChunkRunner:
         return items
 
     def _write_chunks(self, out_path: Path, chunks: List[Chunk]) -> None:
+        """Écrit les chunks dans un fichier JSONL."""
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8") as f:
             for c in chunks:
                 f.write(json.dumps(c.model_dump(), ensure_ascii=False) + "\n")
 
     def run_series(self, series: str) -> dict:
+        """
+        Exécute le processus de chunking pour une série de documents.
+        """
         series_dir = self.storage.ensure_series(series)
         extracted_dir = series_dir / "extracted"
         report_path = extracted_dir / "_report.json"
@@ -319,5 +336,8 @@ class ChunkRunner:
 
 # Utilitaire simple (API stable existante)
 def by_tokens(blocks: Iterable[TextBlock], max_tokens=600, overlap=80) -> List[Chunk]:
+    """
+    Divise les blocs de texte en chunks basés sur le nombre de tokens.
+    """
     opts = ChunkOptions(strategy="tokens", size=max_tokens, overlap=overlap)
     return Chunker(opts).split_blocks(blocks)

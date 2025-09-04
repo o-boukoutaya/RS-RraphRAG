@@ -12,6 +12,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 def _sha256_file(p: Path) -> str:
+    """Calcule le hash SHA-256 d'un fichier."""
     h = hashlib.sha256()
     with p.open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
@@ -19,6 +20,7 @@ def _sha256_file(p: Path) -> str:
     return h.hexdigest()
 
 def _detect_lang(text: str) -> Optional[str]:
+    """Detecte la langue d'un texte (extrait)."""
     try:
         from langdetect import detect
         sample = text[:2000]
@@ -36,6 +38,7 @@ class ExtractorRunner:
         self.out_dirname = out_dirname
 
     def _write_jsonl(self, path: Path, blocks: List[TextBlock]) -> None:
+        """Écrit les blocs de texte dans un fichier JSONL."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             for b in blocks:
@@ -44,11 +47,13 @@ class ExtractorRunner:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def _append_history(self, history_path: Path, event: Dict) -> None:
+        """Ajoute un événement à l'historique."""
         history_path.parent.mkdir(parents=True, exist_ok=True)
         with history_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
     def run_series(self, series: str, *, options: ExtractOptions | None = None) -> Dict:
+        """Exécute le processus d'extraction pour une série de documents."""
         options = options or ExtractOptions()
         series_dir = self.storage.ensure_series(series)
         out_dir = series_dir / self.out_dirname

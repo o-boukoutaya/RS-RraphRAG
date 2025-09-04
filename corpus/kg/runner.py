@@ -24,7 +24,9 @@ class KGRunner:
         self.db = self.db or Neo4jAdapter()
 
     def run_series(self, series: str, *, limit_chunks: Optional[int] = None) -> Dict[str, Any]:
-        cfg = get_settings()
+        """
+        Exécute le processus d'extraction pour une série de documents.
+        """
         storage = get_storage()
         sdir = storage.ensure_series(series)
         chunks_dir = sdir / "chunks"
@@ -46,6 +48,7 @@ class KGRunner:
         items = report.get("items", [])
         started = time.time()
 
+        # Crée les contraintes d’unicité de base
         self.db.ensure_base_schema()
 
         ents_batch: List[Dict[str, Any]] = []
@@ -58,6 +61,7 @@ class KGRunner:
         dedup_entities: Set[str] = set()
         dedup_relations: Set[tuple] = set()
 
+        # Déduplique les relations
         for it in items:
             out_rel = it.get("output")
             if not out_rel:
@@ -66,6 +70,7 @@ class KGRunner:
             if not fpath.exists():
                 continue
 
+            # Chargement des chunks existants
             kg_jsonl = out_dir / f"{pathlib.Path(it['filename']).stem}.kg.jsonl"
             done_hashes: Set[str] = set()
             if kg_jsonl.exists():
@@ -77,14 +82,19 @@ class KGRunner:
                     except Exception:
                         pass
 
+            # Chargement des chunks à partir du fichier
             with fpath.open(encoding="utf-8") as f:
                 for line in f:
+                    # Limite le nombre de chunks si demandé
                     if limit_chunks and total_chunks >= limit_chunks:
                         break
+                    
                     data = json.loads(line)
                     text = data.get("text", "")
                     if not text.strip():
                         continue
+
+                    # Extraction des métadonnées
                     filename = (data.get("doc") or {}).get("filename") or pathlib.Path(out_rel).stem
                     idx = data.get("idx", data.get("order", 0))
                     page = data.get("page")
@@ -94,6 +104,7 @@ class KGRunner:
                         total_chunks += 1
                         continue
 
+                    # Extraction des entités et relations
                     kg = extract_from_text(
                         text,
                         provider=self.provider,
@@ -104,6 +115,7 @@ class KGRunner:
                         domain_hint=self.domain_hint,
                     )
 
+                    # Écriture des métadonnées dans le fichier JSONL
                     with kg_jsonl.open("a", encoding="utf-8") as out:
                         out.write(json.dumps({
                             "chunk_id": chunk_id,
@@ -115,6 +127,7 @@ class KGRunner:
                             "relations": kg.relations
                         }, ensure_ascii=False) + "\n")
 
+                    # Dé-duplication des entités
                     for e in kg.entities:
                         if e["id"] in dedup_entities:
                             continue
@@ -125,6 +138,7 @@ class KGRunner:
                         if len(ents_batch) >= self.batch_upsert:
                             self.db.upsert_entities(ents_batch); ents_batch.clear()
 
+                    # Dé-duplication des relations
                     for r in kg.relations:
                         key = (r["src"], r["type"], r["dst"])
                         if key in dedup_relations:
@@ -155,6 +169,7 @@ class KGRunner:
         quality = self.db.graph_quality(series=series)
         report["quality"] = quality
 
+        # Rapport d'extraction
         kg_report = {
             "series": series,
             "duration_s": round(time.time() - started, 3),

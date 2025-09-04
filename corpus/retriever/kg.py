@@ -6,10 +6,14 @@ from .schemas import SearchRequest, SearchResponse, Hit
 
 @dataclass
 class KGRetriever:
+    """
+    Récupérateur de connaissances utilisant Neo4j.
+    """
     db: Neo4jAdapter
 
     @staticmethod
     def _base_cypher(series_filter: bool, type_filter: bool) -> str:
+        """Construit la requête de base pour la recherche."""
         # Full‑text sur Entity.name → hits entités
         where_series = "AND ($series IS NULL OR e.series = $series)" if series_filter else ""
         where_type   = "AND ($type IS NULL OR e.type = $type)" if type_filter else ""
@@ -24,6 +28,7 @@ class KGRetriever:
         """
 
     def search(self, req: SearchRequest) -> SearchResponse:
+        """Exécute une recherche en utilisant l'index spécifié."""
         q = self._base_cypher(series_filter=True, type_filter=("type" in req.filters))
         params: Dict[str, Any] = {
             "q": req.query, "k": int(req.k),

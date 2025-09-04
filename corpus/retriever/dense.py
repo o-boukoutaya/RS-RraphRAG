@@ -7,9 +7,11 @@ from .schemas import SearchRequest, SearchResponse, Hit
 
 @dataclass
 class DenseRetriever:
+    """Récupérateur dense utilisant des embeddings et Neo4j."""
     db: Neo4jAdapter
 
     def _embed(self, text: str) -> Optional[List[float]]:
+        """Crée une représentation vectorielle à partir d'un texte."""
         prov = get_provider()
         # L’embedder peut être absent → fallback None
         if prov and hasattr(prov, "embed"):
@@ -20,6 +22,7 @@ class DenseRetriever:
         return None
 
     def _vector_query(self, index_name: str, vec: List[float], k: int) -> List[Dict[str, Any]]:
+        """Exécute une requête vectorielle sur l'index spécifié."""
         q = """
         CALL db.index.vector.queryNodes($index, $k, $vec)
         YIELD node, score
@@ -32,6 +35,7 @@ class DenseRetriever:
             return [r.data() for r in s.run(q, index=index_name, k=int(k), vec=list(vec))]
 
     def _fulltext_fallback(self, qstr: str, k: int, series: Optional[str]) -> List[Dict[str, Any]]:
+        """Exécute une requête de recherche en texte intégral."""
         # nécessite: CREATE FULLTEXT INDEX chunk_text_ft IF NOT EXISTS FOR (c:Chunk) ON EACH [c.text]
         q = """
         CALL db.index.fulltext.queryNodes('chunk_text_ft', $q) YIELD node, score
@@ -46,6 +50,9 @@ class DenseRetriever:
             return [r.data() for r in s.run(q, q=qstr, k=int(k), series=series)]
 
     def search(self, req: SearchRequest) -> SearchResponse:
+        """
+        Exécute une recherche en utilisant l'index spécifié.
+        """
         idx = req.index_name or "chunk_embedding_idx"
         vec = self._embed(req.query)
         diag: Dict[str, Any] = {"index": idx, "used": "vector" if vec else "fulltext"}

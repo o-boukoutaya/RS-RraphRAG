@@ -59,6 +59,7 @@ class Embedder:
         rows_batch: List[Dict[str, Any]] = []
 
         def flush():
+            """Écrit les blocs de texte dans un fichier JSONL."""
             nonlocal total_nodes
             if not rows_batch:
                 return
@@ -142,6 +143,7 @@ class Embedder:
 
     # ----------- recherche top-k -----------
     def search(self, series: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
+        """Recherche les chunks les plus similaires à une requête donnée."""
         index = self._index_name(series)
         vec = self.provider.embed(query)
         return self.db.query_top_k(index, vec, k=k, series=series)
