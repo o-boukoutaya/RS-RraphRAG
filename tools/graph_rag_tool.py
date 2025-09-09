@@ -23,6 +23,18 @@ kg_ret = KGRetriever(_db)
 dn_ret = DenseRetriever(_db)
 hy_ret = HybridRetriever(kg_ret, dn_ret)
 
+
+@mcp.tool()
+async def default_tool(word: str) -> str:
+    """Un outil de test simple."""
+    return f"Tools are ready! Result for: {word}!"
+
+@mcp.tool()
+async def db_ping() -> bool:
+    """ Tester la connexion avec Neo4J """
+    from app.core.resources import test_cnx
+    return test_cnx()
+
 @mcp.tool()
 async def search_data(
     query: str,
@@ -48,6 +60,8 @@ async def search_data(
     else:
         res = hy_ret.search(req)
     return res.model_dump()
+
+
 
 # @mcp.tool()
 # async def rag_search(
