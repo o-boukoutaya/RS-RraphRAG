@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import contextlib, json, logging
 
 from neo4j import GraphDatabase, Driver
@@ -60,8 +60,10 @@ class Neo4jAdapter:
 
     def __enter__(self):
         return self
+    
     def __exit__(self, exc_type, exc, tb):
         self.close()
+    
     def ping(self) -> bool:
         try:
             with self._session() as s:
@@ -76,7 +78,7 @@ class Neo4jAdapter:
         """Active l’écriture JSONL des requêtes (Cypher + params)."""
         log_path.parent.mkdir(parents=True, exist_ok=True)
         self._log_file = log_path
-        log.info("Neo4j query logging -> %s", log_path)
+        # log.info("Neo4j query logging -> %s", log_path)
 
     def _log_cypher(self, q: str, params: Mapping[str, Any]) -> None:
         if not self._log_file:
@@ -217,6 +219,14 @@ class Neo4jAdapter:
             "isolated_entities": int(isolated),
             "offseries_relations": int(offseries),
         }
+    
+    def neighbors_neo4j(self, node_id: str) -> List[Tuple[str, str, float]]:
+        """
+        Retourne (neighbor_id, relation_type, weight) pour PathRAG.
+        """
+        with self._session() as s:
+            q = """MATCH (a {id:$id})-[r]->(b) RETURN b.id AS nid, type(r) AS rel, COALESCE(r.weight,1.0) AS w"""
+            return [(rec["nid"], rec["rel"], float(rec["w"])) for rec in s.run(q, id=node_id)]
 
 # Fabrique
 def client_from_settings() -> Neo4jAdapter:
