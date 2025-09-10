@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, replace
+from .config_kg_models import AppKgCfg
 
 
 import yaml
@@ -17,18 +18,20 @@ from dotenv import load_dotenv
 # Pydantic models (typage fort + auto-doc)
 # ---------------------------------------------------------------------------
 
-# Configuration de l'application
 class AppCfg(BaseModel):
+    """Configuration de l'application"""
     name: str = "rs-rraPhrag"
     env: str = "dev"
     host: str = "127.0.0.1"
     port: int = 8050
     port_snd: int = 8443
     log_level: str = "INFO"
+    transport: str = "sse" # http | stdio | sse
+    kg_app: AppKgCfg = AppKgCfg()
     # dev_reload: bool = True
 
-# Configuration du stockage
 class StorageCfg(BaseModel):
+    """Configuration du stockage des fichiers"""
     root: Path = Path("./data")
     tmp_dir: Path = Path("./data/_tmp")
     series_dirname: str = "series"
@@ -37,9 +40,8 @@ class StorageCfg(BaseModel):
     ])
     max_file_size_mb: int = 64
 
-# Configuration de la base de données Neo4j
-# @dataclass(frozen=True)
 class Neo4jCfg(BaseModel):
+    """Configuration de la base de données Neo4j"""
     uri: str = "bolt://localhost:7687"
     database: str = "neo4j"
     username: str = "neo4j"
@@ -48,73 +50,64 @@ class Neo4jCfg(BaseModel):
     max_connection_lifetime: int = 3600
     max_transaction_retry_time: float = 10.0
 
-# Configuration de l'upload
-# class UploadCfg(BaseModel):
-#     max_size_mb: int = 50
-
-# Configuration du stockage vectoriel chroma DB
 class VectorChromaCfg(BaseModel):
+    """Configuration du stockage vectoriel ChromaDB"""
     persist_dir: Path = Path("./chroma")
 
-# Configuration du stockage vectoriel
 class VectorCfg(BaseModel):
+    """Configuration du stockage vectoriel"""
     provider: str = "chroma"
     chroma: VectorChromaCfg = VectorChromaCfg()
     type: str = "memory"
 
-# Configuration de l'API OpenAI
 class OpenAICfg(BaseModel):
+    """Configuration de l'API OpenAI"""
     api_key: Optional[str] = None
-#     api_base: str = "https://api.openai.com/v1"
     chat_model: str = "gpt-4o-mini"
     embed_model: str = "text-embedding-ada-002"
 
-# Configuration de l'API Azure OpenAI
 class AzureOpenAICfg(BaseModel):
+    """Configuration de l'API Azure OpenAI"""
     api_key: Optional[str] = None
     api_version: str = "2023-07-01-preview"
     azure_endpoint: Optional[str] = None # https://openai4orange.openai.azure.com
     dep_name: Optional[str] = None # "4Orange"
     embed_dep: Optional[str] = "text-embedding-ada-002"
 
-# Configuration de l'API Gemini
 class GeminiCfg(BaseModel):
+    """Configuration de l'API Gemini"""
     api_key: Optional[str] = None
     chat_model: str = "gemini-1.5-pro"
     embed_model: str = "text-embedding-004"
 
-# Configuration du LLM provider
 class ProviderCfg(BaseModel):
+    """Configuration du LLM provider"""
     openai : OpenAICfg = OpenAICfg()
     azure: AzureOpenAICfg = AzureOpenAICfg()
     gemini: GeminiCfg = GeminiCfg()
     default: str = "azure" # openai | azure | gemini
 
-# Configuration de l'OCR
 class OcrCfg(BaseModel):
+    """Configuration de l'OCR"""
     enabled: bool = False
     provider: str = "tesseract"
     languages: List[str] = Field(default_factory=lambda: ["eng", "fra", "ara"])
     tesseract_cmd: Optional[str] = None
     tessdata_prefix: Optional[str] = None
 
-# Configuration du découpage
 class ChunkCfg(BaseModel):
+    """Configuration du découpage des documents"""
     strategy: str = "simple"
     size: int = 800
     overlap: int = 150
 
 
-# # Configuration des embeddings
-# class EmbeddingCfg(BaseModel):
-#     dim: int = 1536
-
-# Configuration des pipelines
 class PipelinesCfg(BaseModel):
+    """Configuration des pipelines"""
     end_to_end: Dict[str, List[str]] | Dict[str, Any] | None = None
 
-# Configuration générale
 class Settings(BaseModel):
+    """Configuration générale de l'application"""
     app: AppCfg = AppCfg()
     storage: StorageCfg = StorageCfg()
     neo4j: Neo4jCfg = Neo4jCfg()
@@ -133,8 +126,8 @@ class Settings(BaseModel):
 # Pattern pour l'expansion des variables d'environnement
 _env_pattern = re.compile(r"\$\{([A-Z0-9_]+)(?::([^}]*))?\}")
 
-# Fonction d'interpolation des variables d'environnement
 def _interpolate_env(value: Any) -> Any:
+    """Interpole les variables d'environnement dans les chaînes de caractères."""
     if isinstance(value, str):
         def repl(match: re.Match[str]) -> str:
             var, default = match.group(1), match.group(2) or ""
@@ -146,8 +139,8 @@ def _interpolate_env(value: Any) -> Any:
         return [_interpolate_env(v) for v in value]
     return value
 
-# Fonction de chargement des fichiers YAML
 def _load_yaml(path: Path) -> Dict[str, Any]:
+    """Charge un fichier YAML et retourne un dictionnaire."""
     if not os.path.exists(path):
         return {}
     with path.open("r", encoding="utf-8") as f:
@@ -158,14 +151,17 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 # Public factory (cache)
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)  # Cache pour éviter de recharger à chaque appel
-# get_settings : renvoie les paramètres de configuration
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Charge .env puis settings.yaml, effectue l'interpolation et valide."""
+    """Charge .env puis settings.yaml, effectue l'interpolation et valide (renvoie les paramètres de configuration)."""
     load_dotenv(override=True)
 
     cfg_path = Path("config/settings.yaml")
+    graph_cfg_path = Path("config/graph_based.yaml")
     data = _load_yaml(cfg_path)
+    data_graph = _load_yaml(graph_cfg_path)
+    # Fusionner les deux configurations
+    data = {**data, **data_graph}
     data = _interpolate_env(data)
 
     try:
@@ -173,27 +169,6 @@ def get_settings() -> Settings:
     except ValidationError as exc:
         # Affiche l'erreur proprement dès le boot
         raise RuntimeError(f"Invalid configuration in {cfg_path}:\n{exc}")
-
-
-# Fonction de validation des paramètres
-# def validate_settings(settings):
-#     p = settings.llm.provider
-#     missing = []
-#     if p == "openai":
-#         for k in ["api_key", "base_url", "chat_model", "embed_model"]:
-#             if not getattr(settings.llm.openai, k, None):
-#                 missing.append(f"llm.openai.{k}")
-#     elif p == "azure":
-#         for k in ["api_key", "endpoint", "api_version", "chat_deployment", "embed_deployment"]:
-#             if not getattr(settings.llm.azure, k, None):
-#                 missing.append(f"llm.azure.{k}")
-#     elif p == "gemini":
-#         for k in ["api_key", "chat_model", "embed_model"]:
-#             if not getattr(settings.llm.gemini, k, None):
-#                 missing.append(f"llm.gemini.{k}")
-#     if missing:
-#         raise RuntimeError(f"Invalid settings for provider={p}: missing {', '.join(missing)}")
-
 
 # ---------------------------------------------------------------------------
 # Public API

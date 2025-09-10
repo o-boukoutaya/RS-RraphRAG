@@ -1,0 +1,33 @@
+# config/graph_based.yaml
+runtime:
+  model: gpt-4o-mini
+  max_tokens: 700
+  temperature: 0.1
+  parallelism: 8
+budgets:
+  token_max: 3000
+  token_guardrail_global: 1200      # C0→C1→C2 escalade
+  token_guardrail_path: 900          # N,K,α,θ choisis pour rester <900
+router:
+  confidence_min: 0.62               # score heuristique (0–1)
+  intent_rules:
+    global_keywords: ["overall","compare","trend","summary","overview","taxonomy","report"]
+pathrag:
+  N: 40
+  K: 15
+  alpha: 0.8
+  theta: 0.05
+  lite:
+    N: 20
+    K: 5
+graphrag:
+  levels: ["C0","C1","C2","C3"]
+  default_level: "C0"
+  escalate_if_conf_low: true
+el:
+  topk_bm25: 20
+  topk_dense: 20
+  allow_none: true
+ontology:
+  schema: ./ontology.yaml            # types, relations autorisées
+
