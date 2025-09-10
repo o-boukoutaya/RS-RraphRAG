@@ -23,11 +23,11 @@ def get_neo4j_settings():
 def get_db():
     return Neo4jAdapter()
 
-# @lru_cache
-# def test_cnx():
-#     from adapters.db.neo4j import Neo4jAdapter
-#     db = Neo4jAdapter()
-#     return db.ping()
+@lru_cache
+def test_cnx():
+    from adapters.db.neo4j import Neo4jAdapter
+    db = Neo4jAdapter()
+    return db.ping()
 
 @lru_cache
 def get_all_settings():
