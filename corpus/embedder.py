@@ -4,7 +4,7 @@ from __future__ import annotations
 import json, time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from app.core.resources import get_storage
 from adapters.db.neo4j import Neo4jAdapter
@@ -104,6 +104,7 @@ class Embedder:
             for i in range(0, len(texts), self.batch_size):
                 batch_texts = texts[i:i + self.batch_size]
                 vecs = self.provider.embed_batch(batch_texts, dimensions=dimensions)
+                vecs = self.embed_texts(batch_texts, dim=dimensions)
                 if vecs:
                     if vec_dim is None:
                         vec_dim = len(vecs[0])
@@ -140,6 +141,24 @@ class Embedder:
             "vectors": total_vectors,
             "upserted_nodes": total_nodes,
         }
+    
+    
+    def _hash_vec(self, text: str, dim: Optional[int] = 384) -> List[float]:
+        import hashlib, math
+        h = hashlib.sha256(text.encode("utf-8")).digest()
+        vals = []
+        while len(vals) < (dim or 384):
+            for b in h:
+                vals.append((b - 128) / 128.0)
+                if len(vals) >= (dim or 384):
+                    break
+        n = math.sqrt(sum(x*x for x in vals))
+        return [x/(n or 1.0) for x in vals]
+
+    def embed_texts(self, texts: Iterable[str], dim: Optional[int] = 384) -> List[List[float]]:
+        if self.provider.embed_texts is not None:
+            return self.provider.embed_texts(list(texts), dimensions=dim)
+        return [self._hash_vec(t or "", dim=dim) for t in texts]
 
     # ----------- recherche top-k -----------
     def search(self, series: str, query: str, k: int = 5) -> List[Dict[str, Any]]:
