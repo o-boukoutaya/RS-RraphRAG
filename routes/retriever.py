@@ -1,8 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Body, UploadFile, File, Form
-from app.core.resources import get_provider
-from corpus.embedder import Embedder
-from adapters.db.neo4j import Neo4jAdapter
+
 
 from corpus.retriever.schemas import SearchRequest, SearchResponse
 from tools.graph_rag_tool import kg_ret, dn_ret, hy_ret

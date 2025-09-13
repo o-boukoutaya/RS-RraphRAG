@@ -30,6 +30,7 @@ ref-kg/
 * copy.py
 *.zip
 *.exe
+graph_ref/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

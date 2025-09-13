@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import contextlib, asyncio
 from app.core.config import get_settings
 
-from tools.graph_rag_tool import mcp as mcp_app
+from tools.mcp_tools import mcp as mcp_app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

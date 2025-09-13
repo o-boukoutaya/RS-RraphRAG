@@ -11,12 +11,10 @@ from .logging import request_id_var, get_logger, new_request_id
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """Injecte un request_id + logs start/stop + durée."""
 
-
     def __init__(self, app, header_name: str = "X-Request-Id") -> None: # type: ignore[no-untyped-def]
         super().__init__(app)
         self.header_name = header_name
         self.log = get_logger(__name__)
-
 
     async def dispatch(self, request: Request, call_next: Callable): # type: ignore[override]
         rid = request.headers.get(self.header_name) or new_request_id()

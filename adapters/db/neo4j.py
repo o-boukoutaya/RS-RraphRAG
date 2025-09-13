@@ -72,6 +72,16 @@ class Neo4jAdapter:
         except Neo4jError as ex:
             log.error("Neo4j ping failed: %s", ex)
             return False
+        
+    def run_cypher(self, query: str, params: Optional[Mapping[str, Any]] = None) -> Any:
+        """Exécute une requête Cypher arbitraire (ex: pour opérations personnalisées)."""
+        self._log_cypher(query, params or {})
+        with self._session() as s:
+            res = s.run(query, **(params or {}))
+            try:
+                return [r.data() for r in res]
+            except Exception:
+                return None
 
     # ---------- Cypher logging ----------
     def enable_query_logging(self, log_path: Path) -> None:
@@ -133,6 +143,14 @@ class Neo4jAdapter:
         self._log_cypher(q, params)
         with self._session() as s:
             return int(s.run(q, **params).single()["n"])
+    
+    # stream_chunks(series) → respect this output (cid, text, meta)
+    def stream_chunks(self, series: str) -> List[Dict[str, Any]]:
+        q, params = C.GET_CHUNKS_BY_SERIES, {"series": series}
+        self._log_cypher(q, params)
+        with self._session() as s:
+            res = s.run(q, **params)
+            return [r.data() for r in res]
 
     # ---------- Similarité ----------
     def query_top_k(self, index_name: str, query_vec: Sequence[float], k: int = 5) -> List[Dict[str, Any]]:

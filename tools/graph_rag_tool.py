@@ -1,41 +1,31 @@
+# tools/graph_rag_tool.py
 from __future__ import annotations
-from typing import Literal
-from fastmcp import FastMCP
+from typing import Literal, Dict, Any, Optional
+# from fastmcp import FastMCP
+
+# -- Core --------
+from app.core.resources import get_db, get_provider
+from app.core.logging import setup_logging, get_logger
+
+# -- Corpus ------
 from corpus.retriever.schemas import SearchRequest, SearchResponse
 from corpus.retriever.kg import KGRetriever
 from corpus.retriever.dense import DenseRetriever
 from corpus.retriever.hybrid import HybridRetriever
-from adapters.db.neo4j import client_from_settings
-from app.core.resources import get_db
-
-from adapters.db.neo4j import Neo4jAdapter
-from adapters.llm.openai_azure import AzureOpenAIProvider  # ou GeminiProvider selon provider
-from app.core.resources import get_provider
 # from corpus.kg.runner import retriever_query   # ta logique existante
 
 
 
-mcp = FastMCP(title="GraphRAG MCP")
 
 # Pré-instanciation (singleton)
-_db = client_from_settings()
+_db = get_db()
 kg_ret = KGRetriever(_db)
 dn_ret = DenseRetriever(_db)
 hy_ret = HybridRetriever(kg_ret, dn_ret)
 
 
-@mcp.tool()
-async def default_tool(word: str) -> str:
-    """Un outil de test simple."""
-    return f"Tools are ready! Result for: {word}!"
+# ===== Tool de recherche dans KG / index vectoriel / hybride ============================
 
-@mcp.tool()
-async def db_ping() -> bool:
-    """ Tester la connexion avec Neo4J """
-    from app.core.resources import test_cnx
-    return test_cnx()
-
-@mcp.tool()
 async def search_data(
     query: str,
     mode: str = "hybrid",
@@ -61,9 +51,8 @@ async def search_data(
         res = hy_ret.search(req)
     return res.model_dump()
 
+# ========================================================================================
 
-
-# @mcp.tool()
 # async def rag_search(
 #     query: str,
 #     mode: Literal["kg", "vec", "hybrid"] = "hybrid",
@@ -74,7 +63,7 @@ async def search_data(
 #     # appelle ton retriever existant et retourne un JSON structuré (déjà en place chez toi)
 #     return await retriever_query(query=query, mode=mode, k=k, series=series)
 
-# @mcp.tool()
+
 # async def rag_cypher(nl_query: str, series: Optional[str] = None, k: int = 50) -> dict:
 #     """Traduction NL→Cypher via LLM puis exécution sur Neo4j (résultats tabulaires)."""
 #     provider = get_provider()
@@ -86,7 +75,6 @@ async def search_data(
 #     return {"cypher": cypher, "params": params, "rows": rows}
 
 # # (optionnel)
-# @mcp.tool()
 # async def rag_answer(question: str, series: Optional[str] = None, k: int = 6, mode: str = "hybrid") -> dict:
 #     """Recherche + génération d'une réponse 'finale' citée (chunks & entités)."""
 #     provider = get_provider()

@@ -5,6 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from adapters.llm.openai import OpenAIProvider
 from adapters.llm.phi import PhiLocalProvider
+from app.mcp import MCPServer
 from app.core.config import get_settings
 from typing import List, Optional
 
@@ -15,23 +16,28 @@ from adapters.llm.openai_azure import AzureOpenAIProvider
 from adapters.llm.gemini import GeminiProvider
 
 
-@lru_cache
-def get_neo4j_settings():
-    return client_from_settings()
+# ---------- Core-Settings-Server ----------------------------
 
 @lru_cache
-def get_db():
-    return Neo4jAdapter()
+def get_neo4j_settings(): return client_from_settings()
+
+@lru_cache
+def get_all_settings(): return get_settings()
+
+@lru_cache
+def get_mcp(): return MCPServer().mcp
+
+# ---------- Adapters : Neo4j -------------------------
+
+@lru_cache
+def get_db(): return Neo4jAdapter()
 
 @lru_cache
 def test_cnx():
-    from adapters.db.neo4j import Neo4jAdapter
-    db = Neo4jAdapter()
+    db = get_db()
     return db.ping()
 
-@lru_cache
-def get_all_settings():
-    return get_settings()
+# ---------- Adapters : LLM / Embd --------------------
 
 @lru_cache
 def get_provider():
@@ -52,18 +58,6 @@ def ask_llm(query: str):
     provider = get_provider()
     resp =  provider.ask_llm(query)
     return {"response": resp, "provider": provider.__class__.__name__}
-
-
-@lru_cache
-def get_storage():
-    # lisez la racine depuis votre config actuelle
-    return LocalStorage()
-
-@lru_cache
-def get_all_series() -> List[str]:
-    """ Retourner la liste des séries sous data/series"""
-    series_dir = Path("data/series")
-    return [d.name for d in series_dir.iterdir() if d.is_dir()]
 
 @lru_cache
 def sanity_check_gemini_ask() -> str:
@@ -97,3 +91,39 @@ def sanity_check_phi_embd() -> int:
     from adapters.llm.phi import PhiLocalProvider
     p = PhiLocalProvider()
     return len(p.embed("hello"))
+
+
+# ---------- Adapters : Storage -----------------------
+
+@lru_cache
+def get_storage():
+    # lisez la racine depuis votre config actuelle
+    return LocalStorage()
+
+@lru_cache
+def get_all_series() -> List[str]:
+    """ Retourner la liste des séries sous data/series"""
+    series_dir = Path("data/series")
+    return [d.name for d in series_dir.iterdir() if d.is_dir()]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -45,6 +45,21 @@ FOREACH (vec IN CASE WHEN row.embedding IS NULL THEN [] ELSE [row.embedding] END
 RETURN count(c) AS n
 """
 
+GET_CHUNKS_BY_SERIES_OLD = """
+MATCH (c:Chunk)
+WHERE c.series = $series
+RETURN c
+"""
+
+GET_CHUNKS_BY_SERIES = """
+MATCH (c:Chunk)
+WHERE c.series = $series
+RETURN c.id AS cid,
+       c.text AS text,
+       coalesce(c.meta_json, "{}") AS meta
+ORDER BY c.id
+"""
+
 # ---------- Similarité ----------
 QUERY_TOP_K = """
 CALL db.index.vector.queryNodes($index, $k, $vec)
