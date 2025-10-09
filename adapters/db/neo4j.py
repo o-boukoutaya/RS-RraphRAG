@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import contextlib, json, logging
+import re
 
 from neo4j import GraphDatabase, Driver
 from neo4j.exceptions import Neo4jError
@@ -109,27 +110,34 @@ class Neo4jAdapter:
 
     # ---------- Index vectoriel ----------
     def check_index_exists(self, name: str) -> bool:
+        safe = self._safe_index_name(name)
         with self._session() as s:
-            rec = s.run(C.VECTOR_INDEX_EXISTS, name=name).single()
+            rec = s.run(C.VECTOR_INDEX_EXISTS, name=safe).single()
             return bool(rec and rec["c"] > 0)
+        
+    def _safe_index_name(self, _raw: str) -> str:
+        # garde uniquement lettres/chiffres/underscore
+        return re.sub(r'[^A-Za-z0-9_]', '_', _raw)
 
     def create_vector_index(self, name: str, *, label="Chunk", prop="embedding",
                             dimensions: int = 1536, similarity="cosine") -> None:
-        q = C.vector_index_create(name, label, prop)
+        safe = self._safe_index_name(name)
+        q = C.vector_index_create(safe, label, prop)
         params = {"dim": int(dimensions), "sim": similarity}
         self._log_cypher(q, params)
         with self._session() as s:
             s.run(q, **params).consume()
 
     # ---------- Ingestion : Chunks ----------
-    def upsert_chunks(self, rows: Sequence[Mapping[str, Any]],
-                      *, series: Optional[str] = None,
-                      approach: Optional[str] = None,
-                      build_id: Optional[str] = None) -> int:
+    def upsert_chunks(self, rows: Sequence[Mapping[str, Any]], # Chunks à ingérer
+                      *, series: Optional[str] | None = None, # série de documents
+                      approach: Optional[str] | None = None, # méthode d’extraction (ex: "embedder")
+                      build_id: Optional[str] | None = None) -> int: # id de construction (optionnel)
         safe: List[Dict[str, Any]] = []
         for r in rows:
+            log.info("Upserting chunk: %s", r)
             safe.append({
-                "id": r["id"],
+                "cid": r.get("cid"),
                 "series": r.get("series") or series,
                 "doc_id": r.get("doc_id"),
                 "page": r.get("page"),
@@ -146,11 +154,11 @@ class Neo4jAdapter:
     
     # stream_chunks(series) → respect this output (cid, text, meta)
     def stream_chunks(self, series: str) -> List[Dict[str, Any]]:
-        q, params = C.GET_CHUNKS_BY_SERIES, {"series": series}
+        q, params = C.GET_CHUNKS_BY_SERIES_OLD, {"series": series}
         self._log_cypher(q, params)
         with self._session() as s:
             res = s.run(q, **params)
-            return [r.data() for r in res]
+            return [r.data().get("c") for r in res]
 
     # ---------- Similarité ----------
     def query_top_k(self, index_name: str, query_vec: Sequence[float], k: int = 5) -> List[Dict[str, Any]]:

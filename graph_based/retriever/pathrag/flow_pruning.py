@@ -9,13 +9,13 @@ def _path_score(path: Dict[str, Any], *, alpha: float) -> float:
     """
     Score = alpha^(L-1) * moyenne(conf_nodes U conf_edges)
     """
-    L = max(1, int(path.get("length", 1)))
+    L = max(1, int(path.get("length", 1)))  # longueur (>=1)
     vals = []
     for n in path.get("nodes", []):
-        vals.append(float(n.get("conf", 0.5)))
+        vals.append(float(n.get("conf", 0.5))) # défaut 0.5 si absent ou None
     for e in path.get("edges", []):
         vals.append(float(e.get("conf", 0.5)))
-    base = sum(vals)/len(vals) if vals else 0.5
+    base = sum(vals)/len(vals) if vals else 0.5 # défaut 0.5 si pas de noeuds/edges
     return (alpha ** (L-1)) * base
 
 

@@ -103,7 +103,10 @@ async def run_chunk(
 async def embed_series(body: dict = Body(...)):
     series = body.get("series")
     dims = body.get("dimensions")
-    emb = Embedder(provider=get_provider(), db=get_db())
+    # return {"status": "started", "series": series, "dimensions": dims}
+    emb = Embedder()
+    if not series:
+        raise HTTPException(status_code=422, detail="Field 'series' is required")
     return emb.embed_corpus(series, dimensions=dims)
 
 @router.post("/search") # POST /api/corpus/search avec body { "series": "...", "q": "...", "k": 5 }

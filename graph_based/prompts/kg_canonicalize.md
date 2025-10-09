@@ -1,35 +1,27 @@
 # KG Canonicalize (chunk → entities & relations)
 
-ROLE: You are an information-extraction engine. From the CHUNK below, you must return a
-STRICT, MINIMAL JSON object describing canonical ENTITIES and RELATIONS grounded in
-the text. Use conservative confidence estimates ∈ [0,1].
-
-INSTRUCTIONS:
-- Normalize names (singular, no caps noise), prefer concise canonical forms.
-- Prefer high-precision over recall. If unsure, drop the item.
-- Attach the current chunk_id in "cids" for every entity/relation produced.
-- Entity "type" is a short noun ("product", "person", "org", "place", "metric", "concept", ...).
-- Use English keys; values (names/desc) may stay in source language.
-- Keep descriptions ≤ 40 words. “aliases” is optional.
-- DO NOT hallucinate relations; only assert if explicitly or strongly implied.
+- Return **exactly one** JSON object, and nothing else (no prose, no code fences).
+- **Do not hallucinate** relations. Only assert if explicitly or strongly implied.
+- Entity descriptions ≤ 40 words. Confidence `conf` ∈ [0,1].
+- Canonicalize names (casefold, trim punctuation), deduplicate via `aliases`.
 
 SCHEMA (return exactly ONE JSON object, nothing else):
 {
   "entities": [
     {
-      "name": "string",              // canonical label
-      "type": "string",              // coarse-grained type
-      "aliases": ["string", ...],    // optional
-      "desc": "string",              // short description
-      "conf": 0.0                    // confidence in [0,1]
+      "name": "string",          // canonical label
+      "type": "string",          // coarse-grained type (e.g., person, org, product, location, date, metric, other)
+      "aliases": ["string", ...],
+      "desc": "short description",
+      "conf": 0.0
     }
   ],
   "relations": [
     {
-      "src": "string",               // entity name as above
-      "pred": "string",              // relation verb/noun in snake_case (e.g., "founded_by")
-      "dst": "string",               // entity name as above
-      "conf": 0.0                    // confidence in [0,1]
+      "src": "string",           // entity name as above (canonical)
+      "pred": "string",          // relation verb/noun in snake_case (e.g., "founded_by", "located_in")
+      "dst": "string",           // entity name as above (canonical)
+      "conf": 0.0
     }
   ]
 }
@@ -39,8 +31,12 @@ CONTEXT:
 - chunk_id: {{cid}}
 
 CHUNK:
-"""
 {{chunk_text}}
-"""
 
-Return ONLY the JSON object. No markdown. No prose.
+CONSTRAINTS:
+- Prefer entity types among: person | organization | product | location | date | metric | other.
+- Use deterministic ordering:
+  - entities sorted by `name` (asc),
+  - relations sorted by (`src`, `pred`, `dst`) (asc/lexicographic).
+- If no entity or relation is supported by the text, return:
+  { "entities": [], "relations": [] }

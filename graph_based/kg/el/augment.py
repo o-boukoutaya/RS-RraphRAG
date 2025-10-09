@@ -2,18 +2,28 @@ from __future__ import annotations
 import json
 import re
 from typing import List, Tuple, Dict, Any
+from app.core.resources import get_db, get_provider
+from graph_based.prompts import render_template
 from graph_based.utils.types import NodeRecord, EdgeRecord
+from graph_based.utils.ids import node_id, stable_id
 from collections import defaultdict
-from utils.ids import node_id, stable_id
+
 
 # ---------------- Prompt LLM ----------------
 
+# def render_el_prompt(mention: Dict[str, Any], candidates: List[Dict[str, Any]]) -> str:
+#     # charge le prompt contenu depuis prompts/el_entgpt.md
+#     from pathlib import Path
+#     prompt_md = Path("prompts/el_entgpt.md").read_text(encoding="utf-8")
+#     prompt = prompt_md.format(mention=mention, candidates=candidates)
+#     return prompt
+
 def render_el_prompt(mention: Dict[str, Any], candidates: List[Dict[str, Any]]) -> str:
-    # charge le prompt contenu depuis prompts/el_entgpt.md
-    from pathlib import Path
-    prompt_md = Path("prompts/el_entgpt.md").read_text(encoding="utf-8")
-    prompt = prompt_md.format(mention=mention, candidates=candidates)
-    return prompt
+    return render_template(
+        "graph_based/prompts/el_entgpt.md",
+        mention=mention,
+        candidates=candidates
+    )
 
 def _safe_parse_json(s: str) -> dict:
     # 1) tentative directe
@@ -32,22 +42,25 @@ def _safe_parse_json(s: str) -> dict:
 
 # ---------------- run ----------------
 
-def run(series: str, nodes: List[NodeRecord], edges: List[EdgeRecord], *, db, provider) -> Tuple[List[NodeRecord], List[EdgeRecord]]:
+def run(series: str, nodes: List[NodeRecord], edges: List[EdgeRecord]) -> Tuple[List[NodeRecord], List[EdgeRecord]]:
     """
     Enrichit/alimente le KG par désambiguïsation et alignement (EntGPT-like).
     - Input: nodes/edges issus de canonicalize.run
     - Process:
-        a) candidates.generate(...) → top candidats par mention.
+        a) fingerprint simple (nom normalisé sans stop-words courts).
         b) select.choose(...) → sélection 'multi-choice' (avec option 'None').
         c) fusion: merge attributs/aliases/sources ; suppression des doublons.
         d) complétion légère de relations manquantes (synonym/isA/contains si robustes).
     - Output: nodes', edges' (qualifiés, moins de doublons).
     - Side-effects: aucun (upsert délégué à graph_store).
     """
-    # 1) CANDIDATES — blocking par fingerprint
-    by_fp = defaultdict(list)
+    # database et provider LLM depuis resources
+    db, provider = get_db(), get_provider()
+
+    # 1) CANDIDATES — blockage par "fingerprint" simple : nom normalisé sans stop-words courts
+    by_fp = defaultdict(list) # fingerprint -> [nodes]
     def fp(name: str) -> str:
-        s = ''.join(ch for ch in name.lower() if ch.isalnum() or ch.isspace())
+        s = ''.join(ch for ch in name.lower() if ch.isalnum() or ch.isspace()) # keep alnum + space
         s = ' '.join(w for w in s.split() if len(w) > 2)  # vire stop-words courts
         return s[:64]
 

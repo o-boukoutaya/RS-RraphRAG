@@ -1,4 +1,5 @@
 from typing import List, Tuple, Dict, Any, Optional, Iterable
+from app.core.resources import get_db, get_provider
 from graph_based.utils.types import NodeRecord, EdgeRecord, Community, BuildReport, Summary
 
 from graph_based.kg.build import canonicalize, graph_store
@@ -7,7 +8,7 @@ from graph_based.kg.community import hierarchy, leiden
 from graph_based.kg.summarize import comm_summaries, index_search
 import time
 
-def run(series: str, options: Dict[str, Any], *, db, provider) -> BuildReport:
+def run(series: str, options: Dict[str, Any]) -> BuildReport:
     """
     Orchestrateur 'build' (appelé par la route HTTP).
     Steps:
@@ -20,21 +21,24 @@ def run(series: str, options: Dict[str, Any], *, db, provider) -> BuildReport:
       7) indexes     = index_search.sync(series, db=db)
       8) return BuildReport
     """
+    # database et provider LLM depuis resources
+    db, provider = get_db(), get_provider()
+    
     # S'assurer de l'existence des contraintes
     graph_store.ensure_constraints(db=db)
 
     start_time = time.perf_counter()
     # 1. Canonicalisation + validation
-    nodes, edges = canonicalize.run(series, db=db, provider=provider, min_conf=options.get("min_conf",0.35))
+    nodes, edges = canonicalize.run(series, min_conf=options.get("min_conf",0.35))
 
     # 2. Enrichissement / alignement
-    nodes, edges = augment.run(series, nodes, edges, db=db, provider=provider)
+    nodes, edges = augment.run(series, nodes, edges)
 
     # 3. Persistance dans le KG (upsert transactionnel)
-    write = graph_store.upsert(series, nodes, edges, db=db)
+    write = graph_store.upsert(series, nodes, edges)
 
     # 4. Détection de communautés hiérarchiques (Leiden)
-    comms = leiden.detect(series, edges, db=db, levels=options["community"]["levels"], resolution=options["community"]["resolution"])
+    comms = leiden.detect(series, levels=options["community"]["levels"], resolution=options["community"]["resolution"])
 
     # 5. Filtrage et hiérarchisation des communautés
     hierarchy.wire(series, comms, db=db)

@@ -102,6 +102,7 @@ class GeminiProvider(Provider):
         resp = self._chat.invoke(query)  # type: ignore[union-attr]
         return getattr(resp, "content", str(resp))
     
+    
     def capabilities(self) -> Dict:
         dims = None
         try:

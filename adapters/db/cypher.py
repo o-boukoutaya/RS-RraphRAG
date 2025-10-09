@@ -13,8 +13,8 @@ BASE_SCHEMA = [
 
 def vector_index_create(name: str, label="Chunk", prop="embedding") -> str:
     return f"""
-    CREATE VECTOR INDEX {name} IF NOT EXISTS
-    FOR (n:{label}) ON (n.{prop})
+    CREATE VECTOR INDEX `{name}` IF NOT EXISTS
+    FOR (n:`{label}`) ON (n.`{prop}`)
     OPTIONS {{
       indexConfig: {{
         `vector.dimensions`: $dim,
@@ -32,7 +32,7 @@ RETURN count(*) AS c
 # ---------- Ingestion (Chunks) ----------
 UPSERT_CHUNKS = """
 UNWIND $rows AS row
-MERGE (c:Chunk {id: row.id})
+MERGE (c:Chunk {id: row.cid})
 SET   c.series     = coalesce(row.series, c.series),
       c.doc_id     = row.doc_id,
       c.page       = row.page,

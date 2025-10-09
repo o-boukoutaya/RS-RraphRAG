@@ -8,7 +8,6 @@ mcp = get_mcp()
 
 # -- Tools Logic --------
 from app.core.resources import test_cnx
-# from tools.graph_based_tools_ import mcp_spec, query
 from tools.graphrag import mcp_spec, query as graph_query
 from tools.graph_rag_tool import search_data
 
