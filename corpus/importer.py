@@ -75,3 +75,12 @@ class Importer:
             
         # logger.info("Importer:import_docs:end", extra={"series": series, "accepted": len(report.accepted), "rejected": len(report.rejected)})
         return report
+    
+    # Méthodes qui retourne toutes les fichiers importés sous une séries(sous data/) -> [{id,name,size,created}]  
+    def get_series_files(self, serie_name: str):
+        return self.storage.list_series_imported_files(serie_name=serie_name)
+    
+    def serie_meta(self, serie_name: str):
+        meta = self.storage.get_series_metadata(serie_name=serie_name)
+        return meta
+        # return { "files":{meta.get("files", 0)}, "chunks":{meta.get("chunks", 0)}, "embeddings":{meta.get("embeddings", 0)}, "graph":{meta.get("graph", 0)}, "communities":{meta.get("communities", 0)}, "reports":[...] }

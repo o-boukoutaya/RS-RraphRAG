@@ -8,6 +8,7 @@ from routes import api_router
 from contextlib import asynccontextmanager
 import contextlib, asyncio
 from app.core.config import get_settings
+from fastapi.middleware.cors import CORSMiddleware
 
 from tools.mcp_tools import mcp as mcp_app
 
@@ -34,6 +35,14 @@ app = FastAPI(
     title="graphrag",
     lifespan=lifespan
     # lifespan=sub_app.router.lifespan_context,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[ "http://localhost:5173", "http://127.0.0.1:5173", "*" ],  # à restreindre en prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.mount("/mcp-server", sub_app) #, "mcp")

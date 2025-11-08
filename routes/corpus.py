@@ -40,6 +40,21 @@ async def import_docs(
 async def get_series():
     return {"series": get_all_series()}
 
+# cette routes retourne le nombre de documents, date de création, taille totale, etc. d'une série
+# GET /api/corpus/series/{series}/files -> [{id,name,size,created}]
+@router.get("/series/{series_name}/files")
+async def get_series_files(series_name: str):
+    importer = Importer()
+    files = importer.get_series_files(serie_name=series_name)
+    return files
+
+# retourne la liste des fichiers d'une série (nom, taille, et date d'import)
+# GET /api/corpus/series/{series}/status -> { files:{count}, chunks:{count}, embeddings:{count,dim}, graph:{nodes,edges}, communities:{levels,resolution}, reports:[...] }
+@router.get("/series/{series_name}/status")
+async def get_series_stats(series_name: str):
+    importer = Importer()
+    status = importer.serie_meta(series_name)
+    return status
 
 @router.post("/extract-serie")
 async def extract_serie(req: ExtractRequest, background: BackgroundTasks):

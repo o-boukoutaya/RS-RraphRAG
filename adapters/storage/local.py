@@ -86,11 +86,92 @@ class LocalStorage(Storage):
                 raise FileExistsError(f"Series '{series}' already exists")
         d.mkdir(parents=True, exist_ok=True)
         return series
+    
+    def get_serie_details_by_name(self, series: str) -> Optional[dict]:
+        d = self.series_dir(series)
+        if not d.exists() or not d.is_dir():
+            return None
+        total_size = 0
+        created = None
+        for f in d.rglob("*"):
+            if f.is_file():
+                total_size += f.stat().st_size
+                ctime = datetime.fromtimestamp(f.stat().st_ctime)
+                if created is None or ctime < created:
+                    created = ctime
+        return {
+            "id": series,
+            "name": series,
+            "size_bytes": total_size,
+            "created": created.isoformat() if created else None,
+        }
 
     def list_series(self) -> list[str]:
         if not self.series.exists(): return []
         return sorted([p.name for p in self.series.iterdir() if p.is_dir()])
     
+    def list_series_details(self) -> List[dict]:
+        series_list = []
+        if not self.series.exists():
+            return series_list
+        for p in sorted(self.series.iterdir()):
+            if not p.is_dir():
+                continue
+            total_size = 0
+            created = None
+            for f in p.rglob("*"):
+                if f.is_file():
+                    total_size += f.stat().st_size
+                    ctime = datetime.fromtimestamp(f.stat().st_ctime)
+                    if created is None or ctime < created:
+                        created = ctime
+            series_list.append({
+                "id": p.name,
+                "name": p.name,
+                "size_bytes": total_size,
+                "created": created.isoformat() if created else None,
+            })
+        return series_list
+    
+    def list_series_imported_files(self, serie_name) -> List[dict]:
+        """ Tous les fichiers importés, groupés par série donnée (sauf les fichiers JSONL et rapports). """
+        return [
+            {
+                "id": f.name,
+                "name": f.name,
+                "size_bytes": f.stat().st_size,
+                "created": datetime.fromtimestamp(f.stat().st_ctime).isoformat(),
+            }
+            for f in self.series_dir(serie_name).rglob("*")
+            if f.is_file() and f.suffix.lower() not in {".jsonl", ".report"}
+        ]
+    
+    
+    def get_series_metadata(self, serie_name: str) -> dict:
+        return { "files":{0}, "chunks":{0}, "embeddings":{0,765}, "graph":{None,None}, "communities":{3,1.8}, "reports":[] }
+    
+    # def get_series_metadata(self, serie_name: str) -> dict:
+    #     """ Retourne les métadonnées d’une série donnée. """
+    #     d = self.series_dir(serie_name)
+    #     if not d.exists() or not d.is_dir():
+    #         return {}
+    #     meta = {
+    #         "files": 0,
+    #         # "chunks": 0,
+    #         # "embeddings": 0,
+    #         # "graph": 0,
+    #         # "communities": 0,
+    #     }
+    #     for f in d.rglob("*"):
+    #         if f.is_file():
+    #             ext = f.suffix.lower()
+    #             if ext not in {".jsonl", ".report"}:
+    #                 meta["files"] += 1
+    #             # elif ext == ".jsonl":
+    #             #     meta["chunks"] += 1
+    #             # autres types de fichiers peuvent être comptés ici selon la logique métier
+    #     return meta
+
     def delete_series(self, series: str) -> int:
         d = self.series_dir(series)
         if not d.exists():
