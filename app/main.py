@@ -4,11 +4,15 @@ setup_logging("INFO")
 
 from app.core.middleware import RequestContextMiddleware
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.observability.sse import router as dev_router
+from app.observability.sse import attach_sse_log_handler
+
 from routes import api_router
 from contextlib import asynccontextmanager
 import contextlib, asyncio
 from app.core.config import get_settings
-from fastapi.middleware.cors import CORSMiddleware
+
 
 from tools.mcp_tools import mcp as mcp_app
 
@@ -45,9 +49,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Attacher le handler SSE AU DÉMARRAGE
+attach_sse_log_handler()
+
 app.mount("/mcp-server", sub_app) #, "mcp")
 
-# app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RequestContextMiddleware)
+app.include_router(dev_router)
 app.include_router(api_router)
 
 log = get_logger(__name__)
@@ -57,45 +65,6 @@ log.info("App ready.")
 #     import uvicorn
 #     uvicorn.run("main:app", host=get_settings().app.host, port=get_settings().app.port, reload=True)
 #     log.info("App ready.")
-
-
-
-
-# =============================================================================
-# # app/main.py
-# from app.core.logging import setup_logging, get_logger
-# setup_logging("INFO")
-
-# from app.core.middleware import RequestContextMiddleware
-# from fastapi import FastAPI
-# from routes import api_router
-
-# from tools.graph_rag_tool import mcp as mcp_app
-# # from tools.rag_tool import build_server
-# # Sous-app SSE pour MCP (même event loop → latence minimale)
-
-# # mcp_app = build_server(port=8050)
-
-# sub_app = mcp_app.sse_app()
-
-
-# app = FastAPI(
-#     title="graphrag",
-#     lifespan=sub_app.router.lifespan_context,  # réutilise le lifespan SSE
-# )
-
-# app.mount("/mcp-server", sub_app, "mcp")
-
-# # app.add_middleware(RequestContextMiddleware)
-# app.include_router(api_router)
-
-# log = get_logger(__name__)
-
-# log.info("App ready.")
-# =============================================================================
-
-
-
 
 
 
