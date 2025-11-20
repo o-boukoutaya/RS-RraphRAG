@@ -1,5 +1,6 @@
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from collections import defaultdict
+from app.observability.pipeline import pipeline_step
 from graph_based.utils.types import NodeRecord, EdgeRecord
 from app.core.resources import get_db
 
@@ -16,6 +17,7 @@ CONTRAINT_1_5X = """CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQ
 CONTRAINT_2_5X = """CREATE CONSTRAINT chunk_id  IF NOT EXISTS FOR (c:Chunk)  REQUIRE c.id IS UNIQUE;"""
 CONTRAINT_3_5X = """CREATE CONSTRAINT rel_id    IF NOT EXISTS FOR ()-[r:REL]-() REQUIRE r.id IS UNIQUE;"""
 
+@pipeline_step("Graph Build - Ensure Constraints")
 def ensure_constraints(*, db) -> None:
     # for q_4x in [CONTRAINT_1_4X, CONTRAINT_2_4X, CONTRAINT_3_4X]:
     for q_5x in [CONTRAINT_1_5X, CONTRAINT_2_5X, CONTRAINT_3_5X]:
@@ -107,7 +109,8 @@ MATCH (e:Entity {id: r.id})
 MATCH (c:Chunk  {id: cid})
 MERGE (e)-[:MENTIONED_IN]->(c);
 """
-
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Upsert")
 def upsert(series: str, nodes: List[NodeRecord], edges: List[EdgeRecord]) -> Dict[str, Any]:
     """
     Upsert transactionnel dans Neo4j (étiquettes: series, types d’entités, types de relations).

@@ -80,6 +80,8 @@ RETURN communities, count(*) AS memberships;
 # CYPHER_6 pour supprimer la projection (nettoyage)
 CYPHER_6 = "CALL gds.graph.drop($graphName, false) YIELD graphName RETURN graphName"
 
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Community Detection (Leiden)")
 def detect(series: str, levels: int = 3, resolution: float = 1.2) -> List[Community]:
     """
     Détection de communautés (via GDS Leiden) sur le sous-graphe courant de `series`.

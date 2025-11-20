@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
-import contextlib, json, logging
+import contextlib, json#, logging
 import re
 
 from neo4j import GraphDatabase, Driver
@@ -12,7 +12,7 @@ from neo4j.exceptions import Neo4jError
 from app.core.config import get_settings
 from . import cypher as C
 
-log = logging.getLogger("neo4j")
+# log = logging.getLogger("neo4j")
 
 # ------------------ Helpers ------------------
 
@@ -71,12 +71,12 @@ class Neo4jAdapter:
                 s.run("RETURN 1").consume()
             return True
         except Neo4jError as ex:
-            log.error("Neo4j ping failed: %s", ex)
+            # log.error("Neo4j|Ping - Neo4j ping failed: %s", ex)
             return False
         
     def run_cypher(self, query: str, params: Optional[Mapping[str, Any]] = None) -> Any:
         """Exécute une requête Cypher arbitraire (ex: pour opérations personnalisées)."""
-        self._log_cypher(query, params or {})
+        # self._log_cypher(query, params or {})
         with self._session() as s:
             res = s.run(query, **(params or {}))
             try:
@@ -106,7 +106,8 @@ class Neo4jAdapter:
                 try:
                     s.run(qi).consume()
                 except Exception as ex:
-                    log.info("Schema notice: %s", ex)
+                    # log.info("Neo4j|ensure_base_schema - Schema notice: %s", ex)
+                    print("test")
 
     # ---------- Index vectoriel ----------
     def check_index_exists(self, name: str) -> bool:
@@ -124,7 +125,7 @@ class Neo4jAdapter:
         safe = self._safe_index_name(name)
         q = C.vector_index_create(safe, label, prop)
         params = {"dim": int(dimensions), "sim": similarity}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             s.run(q, **params).consume()
 
@@ -135,7 +136,7 @@ class Neo4jAdapter:
                       build_id: Optional[str] | None = None) -> int: # id de construction (optionnel)
         safe: List[Dict[str, Any]] = []
         for r in rows:
-            log.info("Upserting chunk: %s", r)
+            # log.info("Neo4j|Upsert - Upserting chunk: %s", r)
             safe.append({
                 "cid": r.get("cid"),
                 "series": r.get("series") or series,
@@ -148,14 +149,14 @@ class Neo4jAdapter:
                 "build_id": r.get("build_id") or build_id,
             })
         q, params = C.UPSERT_CHUNKS, {"rows": safe}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             return int(s.run(q, **params).single()["n"])
     
     # stream_chunks(series) → respect this output (cid, text, meta)
     def stream_chunks(self, series: str) -> List[Dict[str, Any]]:
         q, params = C.GET_CHUNKS_BY_SERIES_OLD, {"series": series}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             res = s.run(q, **params)
             return [r.data().get("c") for r in res]
@@ -163,7 +164,7 @@ class Neo4jAdapter:
     # ---------- Similarité ----------
     def query_top_k(self, index_name: str, query_vec: Sequence[float], k: int = 5) -> List[Dict[str, Any]]:
         q, params = C.QUERY_TOP_K, {"index": index_name, "k": int(k), "vec": list(query_vec)}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             res = s.run(q, **params)
             return [r.data() for r in res]
@@ -188,7 +189,7 @@ class Neo4jAdapter:
                 "build_id": r.get("build_id") or build_id,
             })
         q, params = C.UPSERT_ENTITIES, {"rows": safe}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             return int(s.run(q, **params).single()["n"])
 
@@ -212,14 +213,14 @@ class Neo4jAdapter:
                 "build_id": r.get("build_id") or build_id,
             })
         q, params = C.UPSERT_RELATIONS, {"rows": safe}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             return int(s.run(q, **params).single()["n"])
 
     # ---------- Traçabilité entité->chunk ----------
     def link_entities_to_chunks(self, links: Sequence[Mapping[str, Any]]) -> int:
         q, params = C.LINK_ENTS_TO_CHUNKS, {"links": list(links)}
-        self._log_cypher(q, params)
+        # self._log_cypher(q, params)
         with self._session() as s:
             rec = s.run(q, **params).single()
             return int(rec["n"]) if rec else 0

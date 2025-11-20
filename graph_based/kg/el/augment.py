@@ -41,7 +41,8 @@ def _safe_parse_json(s: str) -> dict:
         return {"winner": "NONE"}
 
 # ---------------- run ----------------
-
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - EL Augment")
 def run(series: str, nodes: List[NodeRecord], edges: List[EdgeRecord]) -> Tuple[List[NodeRecord], List[EdgeRecord]]:
     """
     Enrichit/alimente le KG par désambiguïsation et alignement (EntGPT-like).

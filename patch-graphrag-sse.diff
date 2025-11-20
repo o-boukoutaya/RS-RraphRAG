@@ -1,0 +1,108 @@
+--- a/app/core/logging.py+++ b/app/core/logging.py@@ -79,4 +79,44 @@ 
+ # Génère un nouvel ID de requête
+ def new_request_id() -> str:
+-    return uuid.uuid4().hex+    return uuid.uuid4().hex
++
++# --- SSE Log streaming support (dev only) -------------------------------------
++# Permet d'envoyer les logs en temps réel via Server-Sent Events (SSE) au front.
++try:
++    import asyncio, json, time
++except Exception:
++    asyncio = None  # type: ignore
++
++_sse_queue = None  # type: ignore
++
++class _SSELogHandler(logging.Handler):
++    def emit(self, record: logging.LogRecord) -> None:
++        global _sse_queue
++        if _sse_queue is None or asyncio is None:
++            return
++        try:
++            # Construit un JSON minimal et autoportant
++            payload = {
++                "ts": getattr(record, "asctime", time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(record.created))),
++                "level": record.levelname,
++                "logger": record.name,
++                "request_id": getattr(record, "request_id", "-"),
++                "message": record.getMessage(),
++            }
++            _sse_queue.put_nowait(json.dumps(payload, ensure_ascii=False))
++        except Exception:
++            # Ne jamais interrompre le flux applicatif à cause de la télémétrie
++            pass
++
++def attach_sse_queue(q) -> None:
++    """Attache une asyncio.Queue[str] pour streamer les logs en SSE."""
++    global _sse_queue
++    _sse_queue = q
++    # Ajouter un handler dédié si non présent
++    root = logging.getLogger()
++    if not any(isinstance(h, _SSELogHandler) for h in root.handlers):
++        h = _SSELogHandler()
++        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
++        h.setFormatter(fmt)
++        root.addHandler(h)
+
+--- a/routes/__init__.py+++ b/routes/__init__.py@@ -6,10 +6,12 @@ import routes.pipelines as pipelines_routes
+ import routes.retriever as retriever_routes
+ import routes.neo4j as neo4j_routes
++import routes.dev as dev_routes
+ 
+ api_router = APIRouter(prefix="/api")
+ api_router.include_router(corpus_routes.router)
+ api_router.include_router(health_routes.router)
+ api_router.include_router(pipelines_routes.router)
+ api_router.include_router(retriever_routes.router)
+-api_router.include_router(neo4j_routes.router)+api_router.include_router(neo4j_routes.router)
++api_router.include_router(dev_routes.router)
+
+--- a/app/main.py+++ b/app/main.py@@ -47,7 +47,7 @@ 
+ app.mount("/mcp-server", sub_app) #, "mcp")
+ 
+-# app.add_middleware(RequestContextMiddleware)
++app.add_middleware(RequestContextMiddleware)
+ app.include_router(api_router)
+ 
+ log = get_logger(__name__)
+@@ -86,7 +86,7 @@ 
+ # app.mount("/mcp-server", sub_app, "mcp")
+ 
+-# # app.add_middleware(RequestContextMiddleware)
++# app.add_middleware(RequestContextMiddleware)
+ # app.include_router(api_router)
+ 
+ # log = get_logger(__name__)
+
+--- /dev/null
++++ b/routes/dev.py
+@@ -0,0 +1,30 @@
++# routes/dev.py
++from fastapi import APIRouter, Request
++from starlette.responses import StreamingResponse
++import asyncio
++from app.core.logging import attach_sse_queue, get_logger
++
++router = APIRouter(prefix="/dev", tags=["dev"])
++log = get_logger(__name__)
++
++# Queue partagée pour le streaming des logs
++log_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=1000)
++attach_sse_queue(log_queue)
++log.info("SSE log stream ready at /api/dev/logs/stream")
++
++@router.get("/logs/stream")
++async def logs_stream(request: Request):
++    async def event_gen():
++        while True:
++            if await request.is_disconnected():
++                break
++            msg = await log_queue.get()
++            yield f"event: log\ndata: {msg}\n\n"
++    headers = {
++        "Cache-Control": "no-cache",
++        "Connection": "keep-alive",
++        "X-Accel-Buffering": "no",
++    }
++    return StreamingResponse(event_gen(),
++                             media_type="text/event-stream",
++                             headers=headers)

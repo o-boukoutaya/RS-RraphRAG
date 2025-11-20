@@ -42,7 +42,8 @@ def render_canonicalize_prompt(series: str, cid: str | None, chunk_text: str) ->
     )
 
 
-
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Canonicalize")
 def run(series: str, *, min_conf: float = 0.35, max_ctx_tokens: int = 1200) -> Tuple[List[NodeRecord], List[EdgeRecord]]:
     """
     Canonicalise et (re)construit la couche 'information' du KG à partir des chunks indexés pour `series`.

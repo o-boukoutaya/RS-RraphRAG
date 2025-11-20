@@ -26,6 +26,8 @@ MATCH (e:Entity {id:r.id})
 SET e.evec = r.vec
 """
 
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Summarization Index Sync")
 def sync(series: str, *, db, provider, batch: int = 256, dim: int | None = None) -> Dict[str, Any]:
     """
     (Ré)indexe les artefacts de résumé et les communautés pour la recherche rapide.

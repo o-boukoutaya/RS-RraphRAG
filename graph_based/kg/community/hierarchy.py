@@ -14,6 +14,8 @@ MATCH (:Community {series:$series, level:$lo})-[p:PARENT {series:$series, from:$
         RETURN count(p) AS n
 """
 
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Community Hierarchy Wiring")
 def wire(series: str, communities: List[Community], *, db) -> Dict[str, Any]:
     """
     Écrit les communautés + relations parent->enfant en base (si pas déjà fait).

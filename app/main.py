@@ -5,33 +5,61 @@ setup_logging("INFO")
 from app.core.middleware import RequestContextMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.observability.sse import router as dev_router
-from app.observability.sse import attach_sse_log_handler
+from app.observability.sse import router as dev_router, attach_sse_log_handler, push_status,SSELogHandler
+from app.observability.state import Phase, STATUS, health_loop
+from app.observability.readiness import ReadinessMiddleware
+
+from dataclasses import asdict
 
 from routes import api_router
-from contextlib import asynccontextmanager
-import contextlib, asyncio
+from contextlib import asynccontextmanager, suppress
+import asyncio, logging
 from app.core.config import get_settings
-
 
 from tools.mcp_tools import mcp as mcp_app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # --- START-UP ---
+    STATUS.phase = Phase.STARTING
+    app.state.ready = False
+    await push_status(asdict(STATUS))            # <-- impulsion immédiate
+
+    # Attacher le handler SSE aux logs
+    handler = attach_sse_log_handler()
+    # app.state.sse_log_handler = handler
+
+    # Lancer la boucle santé
+    app.state.health_task = asyncio.create_task(health_loop())
+
     transport = get_settings().app.transport
-    # START-UP
     if transport == "stdio":
         # Optional: run stdio transport in background (not used when mounting SSE app)
         app.state.mcp_task = asyncio.create_task(mcp_app.run_stdio_async())
-    # For SSE, we'll mount the Starlette sub-app instead of spawning a separate server.
+    STATUS.phase = Phase.RUNNING
+    app.state.ready = True
+    await push_status(asdict(STATUS))            # <-- impulsion immédiate
+    
+    try:
+        yield  # —— l’application tourne ici ——
+    finally:
+        # --- SHUTDOWN ---
+        STATUS.phase = Phase.STOPPING
+        app.state.ready = False
+        await push_status(asdict(STATUS))
 
-    yield  # —— l’application tourne ——
-
-    # SHUT-DOWN
-    if transport in {"sse", "stdio"}:
-        app.state.mcp_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await app.state.mcp_task
+        if transport in {"sse", "stdio"} or getattr(app.state, "mcp_task", None):
+            app.state.mcp_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await app.state.mcp_task
+        
+        health = getattr(app.state, "health_task", None)
+        if health:
+            health.cancel()
+            with suppress(asyncio.CancelledError):
+                await health
+        STATUS.phase = Phase.STOPPED
+        await push_status(asdict(STATUS))
 
 sub_app = mcp_app.sse_app()
 
@@ -40,6 +68,9 @@ app = FastAPI(
     lifespan=lifespan
     # lifespan=sub_app.router.lifespan_context,
 )
+app.add_middleware(
+    ReadinessMiddleware, 
+    is_ready_flag=lambda: getattr(app.state, "ready", False))
 
 app.add_middleware(
     CORSMiddleware,
@@ -88,32 +119,3 @@ log.info("App ready.")
 # http://127.0.0.1:8050/docs#/
 # uvicorn app.main:app --reload --port 8050
 # uvicorn app.main:app --reload --port 8050 --log-level debug <- Lance avec logs verbeux
-
-
-# neptune
-# build graph:
-# - use just LLM with prompt
-# - define classes for graph nodes and relations (as tools) and use the LLM prompt to create them
-# - use LLMGraphTransformer from langchain to transform row text into graph nodes and relations
-
-# from typing import List, Optional
-# class Node(BaseNode):
-#     id: str
-#     labels: str
-#     properties: Optional[List[Property]]
-
-# class Relationship(BaseRelationship):
-#     id: str
-#     source: str
-#     target: str
-#     type: str
-#     properties: Optional[List[Property]]
-
-# class KnowledgeGraph(BaseModel):
-#     """Generate a knowledge graph with entities and relationships."""
-#     nodes: List[Node] = Field(
-#         ..., description="List of nodes in the knowledge graph"
-#     )
-#     rels: List[Relationship] = Field(
-#         ..., description="List of relationships in the knowledge graph"
-#     )

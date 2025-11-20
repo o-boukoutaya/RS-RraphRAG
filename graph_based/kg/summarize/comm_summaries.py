@@ -30,6 +30,8 @@ MATCH (c:Community {series:$series, level:$level, cid:$cid})
 SET c.summary = $summary
 """
 
+from app.observability.pipeline import pipeline_step
+@pipeline_step("Graph Build - Community Summarization")
 def make(series: str, communities: List[Community], levels: List[str] = ["C0","C1"], *, db, provider, max_members: int = 40, max_tokens: int = 1200) -> List[Summary]:
     """
     Génère des résumés de communautés (C0..C3; SS/TS si activés).
