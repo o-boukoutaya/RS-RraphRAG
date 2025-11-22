@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rs-graphrag-backend
+    env_file:
+      - .env          # copie ton .env.example en .env et ajuste les clés
+    ports:
+      - "8050:8050"   # http://localhost:8050
+    volumes:
+      - .:/app
+      - ./data:/app/data            # si tu as un dossier pour les fichiers importés
+      - ./logs:/app/logs            # si tu écris des logs
+    restart: unless-stopped
+  # frontend:
+    # plus tard : un Dockerfile spécifique au projet Vue.js
+
+
+# docker compose build
+# docker compose up       pour lancer le backend
+# docker compose up -d    lancer en arrière-plan
+# http://localhost:8050/docs  tester sur browser
