@@ -20,6 +20,7 @@ from tools.mcp_tools import mcp as mcp_app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application lifecycle."""
     # --- START-UP ---
     STATUS.phase = Phase.STARTING
     app.state.ready = False
