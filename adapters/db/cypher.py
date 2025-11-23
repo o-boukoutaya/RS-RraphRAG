@@ -30,7 +30,7 @@ RETURN count(*) AS c
 """
 
 # ---------- Ingestion (Chunks) ----------
-UPSERT_CHUNKS = """
+UPSERT_CHUNKS_old = """
 UNWIND $rows AS row
 MERGE (c:Chunk {id: row.cid})
 SET   c.series     = coalesce(row.series, c.series),
@@ -42,6 +42,25 @@ SET   c.series     = coalesce(row.series, c.series),
       c.build_id   = row.build_id
 FOREACH (vec IN CASE WHEN row.embedding IS NULL THEN [] ELSE [row.embedding] END |
     SET c.embedding = vec)
+RETURN count(c) AS n
+"""
+
+UPSERT_CHUNKS = """
+UNWIND $rows AS row
+MERGE (c:Chunk {id: row.cid})
+SET c.series = row.series,
+    c.file = row.file,
+    c.page = row.page,
+    c.text = row.text,
+    c.order = row.order,
+    c.provider = row.provider,
+    c.model = row.model,
+    c.dims = row.dims,
+    c.ts = row.ts,
+    c.build_id = row.build_id
+FOREACH (vec IN CASE WHEN row.vec IS NULL THEN [] ELSE [row.vec] END |
+    SET c.embedding = vec
+)
 RETURN count(c) AS n
 """
 

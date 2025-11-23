@@ -141,8 +141,7 @@ class Embedder:
                             "page": m["page"],
                             "order": m["order"],
                             "provider": type(self.provider).__name__,
-                            "model": getattr(self.provider, "embed_model",
-                                    getattr(self.provider, "embed_dep", None)),
+                            "model": getattr(self.provider, "embed_model", getattr(self.provider, "embed_dep", None)),
                             "dims": vec_dim,
                             "ts": now,
                         })
